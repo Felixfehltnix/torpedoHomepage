@@ -1,0 +1,19 @@
+{
+  "url": "https://www.torpedo-dc.de",
+  "name": "DC Torpedo Osnabrück-Schinkel",
+  "email": "",
+  "liga": {
+    "saison": "2026/27",
+    "team": "DC Torpedo Schinkel A",
+    "api": "https://backend-ddv.2k-dart-software.com/2k-backend-ddv/api/v1/frontend/event/1668/phase/2362/round/0",
+    "local": "data/liga.json",
+    "tabelle": "https://portal.3k-darts.com/frontend/events/10/event/1668/table"
+  },
+  "venue": {
+    "name": "Schinkeltreff",
+    "street": "Schützenstr. 56",
+    "city": "49084 Osnabrück",
+    "lat": "52.27847",
+    "lon": "8.07606"
+  }
+}

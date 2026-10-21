@@ -1,0 +1,255 @@
+---
+title: DC Torpedo – Steeldart aus Osnabrück-Schinkel
+description: Der DC Torpedo ist ein Steeldart-Team aus Osnabrück-Schinkel. Heimspiele im Schinkeltreff, Tabelle und Spielplan live, News und Fanshop.
+---
+{{> head}}
+<body class="{{bodyClass}}">
+{{> header}}
+<main id="main">
+
+  <!-- ============ Hero mit Intro-Animation ============ -->
+  <section class="hero" id="top" aria-labelledby="hero-title">
+    <div class="hero__inner">
+      <h1 class="visually-hidden" id="hero-title">DC Torpedo Osnabrück-Schinkel – Steeldart</h1>
+      <button class="intro stage" type="button" data-intro aria-label="Intro nochmal abspielen">
+        <img class="stage__logo intro__logo" src="{{root}}assets/img/logo.svg" alt="" width="550" height="653" fetchpriority="high">
+        <span class="stage__dart intro__dart"><img src="{{root}}assets/img/dart.svg" alt="" width="406" height="59"></span>
+        <span class="intro__ping" aria-hidden="true"></span>
+        <span class="intro__bubbles" aria-hidden="true">
+          <i style="--x:104%;--y:47%;--s:1.6%;--d:.27s;--dx:4px;--dy:-38px"></i>
+          <i style="--x:97%;--y:49.5%;--s:1.3%;--d:.3s;--dx:-3px;--dy:-30px"></i>
+          <i style="--x:91%;--y:46%;--s:2.1%;--d:.33s;--dx:6px;--dy:-52px"></i>
+          <i style="--x:85%;--y:50%;--s:1.5%;--d:.37s;--dx:-5px;--dy:-36px"></i>
+          <i style="--x:79%;--y:46.5%;--s:2.6%;--d:.41s;--dx:3px;--dy:-58px"></i>
+          <i style="--x:74%;--y:49%;--s:1.4%;--d:.46s;--dx:-2px;--dy:-40px"></i>
+          <i style="--x:69.5%;--y:45.5%;--s:2.2%;--d:.52s;--dx:7px;--dy:-50px"></i>
+          <i style="--x:65.5%;--y:50%;--s:1.8%;--d:.58s;--dx:-6px;--dy:-44px"></i>
+          <i style="--x:62.5%;--y:46.5%;--s:2.8%;--d:.66s;--dx:2px;--dy:-62px"></i>
+          <i style="--x:60%;--y:43.5%;--s:3.4%;--d:.76s;--dx:-8px;--dy:-74px"></i>
+          <i style="--x:63.5%;--y:51.5%;--s:2%;--d:.8s;--dx:8px;--dy:-56px"></i>
+          <i style="--x:58%;--y:47.5%;--s:1.5%;--d:.84s;--dx:-4px;--dy:-48px"></i>
+        </span>
+      </button>
+      <div class="hero__tagline">
+        <p class="hero__kicker">Steeldart aus <b>Osnabrück-Schinkel</b></p>
+        <a class="ticker" href="#saison" data-next-match hidden>
+          <span class="ticker__label">Nächstes Spiel</span>
+          <span data-next-text></span>
+          <span class="ticker__go" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+        </a>
+      </div>
+    </div>
+    <a class="scroll-cue" href="#verein" aria-label="Weiter zum Verein">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 9 7 7 7-7"/></svg>
+    </a>
+  </section>
+
+  <!-- ============ 01 Verein ============ -->
+  <section class="section" id="verein" aria-labelledby="verein-title">
+    <div class="wrap club">
+      <div class="club__text reveal">
+        <p class="eyebrow"><span class="eyebrow__num">01</span>Der Verein</p>
+        <h2 class="display" id="verein-title">Bock auf Steeldart und noch alle <em>Tassen</em> im Schrank?</h2>
+        <p class="lead">Wir sind der DC Torpedo – ein Steeldart-Team aus Osnabrück-Schinkel. 2025 ungeschlagen aufgestiegen, Heimspiele im wunderschönen Schinkeltreff und ein Sponsor, der uns mit griechischem Essen durch so manche Halbzeit bringt.</p>
+        <ul class="facts">
+          <li><span class="facts__k">Disziplin</span><span class="facts__v">Steeldart</span></li>
+          <li><span class="facts__k">Liga {{liga.saison}}</span><span class="facts__v" data-liga-name>Bezirksliga 04</span></li>
+          <li><span class="facts__k">Heimspielstätte</span><span class="facts__v">{{venue.name}}</span></li>
+          <li><span class="facts__k">Aufstieg 2025</span><span class="facts__v">Ungeschlagen</span></li>
+        </ul>
+        <div class="club__actions">
+          <a class="btn" href="#kontakt">Mitspielen</a>
+          <a class="btn btn--ghost" href="#saison">Zur Saison</a>
+        </div>
+      </div>
+      <div class="collage reveal" style="--reveal-delay:.1s">
+        <figure class="collage__a">{{img:/assets/img/site/wurf-1600.webp|Ein Torpedo-Spieler im Trikot wirft auf das Board im Schinkeltreff|(min-width: 960px) 380px, 66vw}}</figure>
+        <figure class="collage__b">{{img:/assets/img/site/aufstieg-1600.webp|Das Team feiert den Aufstieg 2025|(min-width: 960px) 190px, 50vw}}</figure>
+        <figure class="collage__c">{{img:/assets/img/site/heimboards-1600.webp|Spieler vor den Heimboards mit dem DC-Torpedo-Banner|(min-width: 960px) 190px, 50vw}}</figure>
+        <span class="collage__tag" aria-hidden="true">Aufstieg 2025</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 02 Saison ============ -->
+  <section class="section section--raised" id="saison" aria-labelledby="saison-title"
+           data-liga data-liga-api="{{liga.api}}" data-liga-local="{{root}}{{liga.local}}" data-liga-team="{{liga.team}}">
+    <div class="wrap">
+      <div class="section__head section__head--split reveal">
+        <div>
+          <p class="eyebrow"><span class="eyebrow__num">02</span><span>Saison {{liga.saison}} · <span data-liga-name>Bezirksliga 04</span></span></p>
+          <h2 class="display display--md" id="saison-title">Bestaune die
+            <span class="rotator" data-rotator data-words="majestätische|überirdische|gottgleiche|legendäre|triumphale|brachiale|königliche|epische|elitäre|makellose|überragende|furchteinflößende|dominierende|phänomenale|glorreiche|sagenhafte|monumentale|unvergleichliche|ikonische|strahlende|majestätisch-überhöhte|rekordbrechende|einschüchternde|brillierende|gnadenlos starke|überdimensionale|fabelhafte|unvergleichbar starke|souveräne|prachtvolle|unaufhaltsame|titanenhafte|unantastbare|überlegene|edelste|spektakuläre|meisterliche|hyperstarke|außergewöhnliche|superstabile|herrliche|absolut erhabene|unfassbare|prachtvoll-leuchtende|knallharte|prestigeträchtige|weltklasse|ultimative|erstklassige|gottkönigliche"><span>majestätische</span></span>
+            Präsenz unseres Teams.</h2>
+        </div>
+        <p class="lead">Tabelle und Spielplan kommen live aus dem Ligasystem des Niedersächsischen Dartverbands. Termine kannst du direkt in deinen Kalender holen.</p>
+      </div>
+
+      <dl class="stats reveal" data-liga-stats>
+        <div class="stat stat--accent"><dt class="stat__k">Tabellenplatz</dt><dd class="stat__v" data-stat="pos"><span class="skeleton" style="width:2.2em"></span></dd></div>
+        <div class="stat"><dt class="stat__k">Punkte</dt><dd class="stat__v" data-stat="pts"><span class="skeleton" style="width:2.2em"></span></dd></div>
+        <div class="stat"><dt class="stat__k">Spiele</dt><dd class="stat__v" data-stat="sets"><span class="skeleton" style="width:2.6em"></span></dd></div>
+        <div class="stat"><dt class="stat__k">Bilanz S-U-N</dt><dd class="stat__v" data-stat="record"><span class="skeleton" style="width:2.6em"></span></dd></div>
+      </dl>
+
+      <div class="season">
+        <div class="panel reveal">
+          <div class="panel__head">
+            <h3 class="panel__title">Tabelle</h3>
+            <span class="panel__meta" data-liga-asof>Wird geladen …</span>
+          </div>
+          <div data-liga-target="table" aria-live="polite">
+            <div style="padding:20px;display:grid;gap:18px">
+              <span class="skeleton"></span><span class="skeleton"></span><span class="skeleton"></span><span class="skeleton"></span><span class="skeleton"></span><span class="skeleton"></span>
+            </div>
+          </div>
+          <div class="panel__foot">
+            <span>Berechnet aus allen Spielergebnissen der Liga.</span>
+            <a href="{{liga.tabelle}}" rel="noopener" target="_blank">Offizielle Tabelle ↗</a>
+          </div>
+        </div>
+
+        <div class="panel reveal" style="--reveal-delay:.08s">
+          <div class="panel__head">
+            <h3 class="panel__title">Spielplan</h3>
+            <div class="tabs" role="tablist" aria-label="Spielplan filtern">
+              <button type="button" role="tab" aria-selected="true" aria-controls="plan" data-plan-tab="upcoming">Kommende</button>
+              <button type="button" role="tab" aria-selected="false" aria-controls="plan" data-plan-tab="results">Ergebnisse</button>
+            </div>
+          </div>
+          <div id="plan" role="tabpanel" data-liga-target="plan" aria-live="polite">
+            <div style="padding:20px;display:grid;gap:18px">
+              <span class="skeleton"></span><span class="skeleton"></span><span class="skeleton"></span><span class="skeleton"></span>
+            </div>
+          </div>
+          <div class="panel__foot">
+            <span>Spielbeginn laut Ligaplan.</span>
+            <button type="button" class="btn-text" data-ics-all>Alle Termine in den Kalender</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 03 News ============ -->
+  <section class="section" id="news" aria-labelledby="news-title">
+    <div class="wrap">
+      <div class="section__head section__head--split reveal">
+        <div>
+          <p class="eyebrow"><span class="eyebrow__num">03</span>Neues aus dem Schinkel</p>
+          <h2 class="display display--md" id="news-title">News</h2>
+        </div>
+        <a class="link-arrow" href="{{link:news/}}">Alle {{newsCount}} Beiträge
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+      </div>
+      <div class="cards">
+      {{newsCards}}
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 04 Schinkeltreff ============ -->
+  <section class="section section--raised" id="schinkeltreff" aria-labelledby="venue-title">
+    <div class="wrap">
+      <div class="section__head reveal">
+        <p class="eyebrow"><span class="eyebrow__num">04</span>Heimspielstätte</p>
+        <h2 class="display display--md" id="venue-title">Wo? Im wunderschönen <em>Schinkeltreff.</em></h2>
+      </div>
+      <div class="venue">
+        <figure class="venue__media reveal">
+          {{img:/assets/img/site/team-heim-1600.webp|Das Team des DC Torpedo vor den Heimboards im Schinkeltreff|(min-width: 960px) 680px, 100vw}}
+          <div class="venue__map" id="map" hidden
+               data-src="https://www.openstreetmap.org/export/embed.html?bbox=8.0700%2C52.2755%2C8.0822%2C52.2815&amp;layer=mapnik&amp;marker={{venue.lat}}%2C{{venue.lon}}"></div>
+        </figure>
+        <div class="venue__card reveal" style="--reveal-delay:.08s">
+          <address>
+            <strong>{{venue.name}}</strong>
+            {{venue.street}}<br>{{venue.city}}
+          </address>
+          <p class="venue__next" data-next-home hidden></p>
+          <div class="venue__actions">
+            <a class="btn" href="https://www.openstreetmap.org/directions?to={{venue.lat}}%2C{{venue.lon}}#map=17/{{venue.lat}}/{{venue.lon}}" rel="noopener" target="_blank">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11 21 3l-8 18-2-8-8-2z"/></svg>
+              Route planen</a>
+            <button class="btn btn--ghost" type="button" data-map-load="#map">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 4-6 2.5v13L9 17l6 3 6-2.5v-13L15 7 9 4z"/><path d="M9 4v13M15 7v13"/></svg>
+              Karte anzeigen</button>
+          </div>
+          <p class="venue__note">Die Karte kommt von OpenStreetMap und wird erst nach Klick geladen.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 05 Sponsor ============ -->
+  <section class="section" id="sponsor" aria-labelledby="sponsor-title">
+    <div class="wrap sponsor">
+      <div class="sponsor__logo reveal">
+        <img src="{{root}}assets/img/site/korfu.webp" alt="Korfu – Gyros, Salate, Pizza &amp; mehr" width="496" height="640" loading="lazy">
+      </div>
+      <div class="reveal" style="--reveal-delay:.08s">
+        <p class="eyebrow"><span class="eyebrow__num">05</span>Powered by</p>
+        <h2 class="sponsor__quote" id="sponsor-title">Das <em>beste</em> griechische Restaurant der Stadt.</h2>
+        <p class="lead">Durch das großzügige Sponsoring vom Korfu wurden unsere einmaligen Trikots realisiert – und in so mancher Halbzeitpause verwöhnt uns Korfu mit herausragender Verpflegung.</p>
+        <p class="sponsor__thanks">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.3C.9 8.3 3 4.5 6.7 4.5c2.2 0 3.6 1.2 4.3 2.4h2c.7-1.2 2.1-2.4 4.3-2.4 3.7 0 5.8 3.8 4.3 7.2C19.5 16.4 12 21 12 21z"/></svg>
+          Vielen Dank, Korfu!
+        </p>
+        <address><strong>Korfu</strong><br>Schützenstraße 113<br>49084 Osnabrück</address>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 06 Fanshop ============ -->
+  <section class="section section--raised" id="fanshop" aria-labelledby="shop-title">
+    <div class="wrap shop">
+      <figure class="shop__media reveal">
+        {{img:/assets/img/site/trikot-1600.webp|Rückseite des schwarzen Torpedo-Trikots mit Logo und Namen|(min-width: 900px) 480px, 100vw}}
+      </figure>
+      <div class="reveal" style="--reveal-delay:.08s">
+        <p class="eyebrow"><span class="eyebrow__num">06</span>Fanshop</p>
+        <h2 class="display display--md" id="shop-title">Trag den Torpedo.</h2>
+        <ul class="products">
+          <li class="product">
+            <h3 class="product__name">Trikot Basic · Schwarz</h3>
+            <span class="product__price">50 €</span>
+            <p class="product__desc">Zeitlos, schick, unvergleichliches Design.</p>
+            <a class="product__action link-arrow" href="https://www.spized.com/designvorschau?cfgId=a3d4d7e83757a75e68000b9517ad60f1ff0cef6b3bb4dd2c378ae5920624a4fe91e9366e4ba0459f1ef6a6db6618a68dffb30397727c75a4aa30e5095ce74db4" rel="noopener" target="_blank">Design ansehen &amp; bestellen
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg></a>
+          </li>
+          <li class="product">
+            <h3 class="product__name">Trikot · Weiß</h3>
+            <span class="product__price">55 €</span>
+            <p class="product__desc">Zeitlos, schick, unvergleichliches Design – in Weiß.</p>
+            <a class="product__action link-arrow" href="https://www.spized.com/designvorschau?cfgId=ec2868daeebcf03947ac236406e18f7cad3b80f71775f2bafe4a7368d91569ce02cd973ea67a221f277f464c922c6796a3b0dc68c00b758b40bb623ee44fa033" rel="noopener" target="_blank">Design ansehen &amp; bestellen
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg></a>
+          </li>
+          <li class="product">
+            <h3 class="product__name">Torpedo-Tasse</h3>
+            <span class="product__price">8 €</span>
+            <p class="product__desc">Eine tolle Tasse mit dem DC-Torpedo-Logo. Für alle, die noch alle Tassen im Schrank haben wollen.</p>
+            <a class="product__action link-arrow" href="#kontakt">Bei uns anfragen
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+          </li>
+        </ul>
+        <p class="shop__note">Bei Fragen schreib uns – wir melden uns innerhalb einer Woche.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 07 Kontakt ============ -->
+  <section class="section contact" id="kontakt" aria-labelledby="kontakt-title">
+    <div class="wrap reveal">
+      <p class="eyebrow" style="justify-content:center"><span class="eyebrow__num">07</span>Mitspielen</p>
+      <h2 class="display" id="kontakt-title">Lust auf eine Runde?</h2>
+      <p class="lead">Schreib uns ’ne kurze Nachricht oder komm einfach vorbei und spiel eine Runde mit.</p>
+      <div class="contact__actions">
+      {{contactActions}}
+      </div>
+    </div>
+  </section>
+
+</main>
+{{> footer}}
+</body>
+</html>

@@ -1,0 +1,23 @@
+<a class="skip-link" href="#main">Zum Inhalt springen</a>
+<header class="site-header{{headerClass}}" {{headerAttr}}>
+  <div class="wrap site-header__bar">
+    <a class="brand" href="{{link:}}" aria-label="DC Torpedo – zur Startseite">
+      <img class="brand__dart" src="{{root}}assets/img/dart.svg" alt="" width="406" height="59">
+      DC <span>Torpedo</span>
+    </a>
+    <button class="nav__toggle" type="button" aria-expanded="false" aria-controls="nav" aria-label="Menü öffnen">
+      <svg class="icon-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
+      <svg class="icon-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+    <nav class="nav" id="nav" aria-label="Hauptnavigation">
+      <ul class="nav__list">
+        <li><a href="{{home}}#verein">Verein</a></li>
+        <li><a href="{{home}}#saison">Saison</a></li>
+        <li><a href="{{link:news/}}">News</a></li>
+        <li><a href="{{home}}#schinkeltreff">Schinkeltreff</a></li>
+        <li><a href="{{home}}#fanshop">Fanshop</a></li>
+        <li><a class="nav__cta" href="{{home}}#kontakt">Mitspielen</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
