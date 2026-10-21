@@ -94,12 +94,13 @@ cd torpedo-website
 docker compose up -d
 ```
 
-- **web** (nginx) liefert `public/` aus, im Beispiel auf Port 8080.
+- **web** (nginx) liefert `public/` aus – nur lokal auf `127.0.0.1:8080`. Ist 8080 belegt, einen anderen Port per
+  `WEB_PORT=8085` in einer `.env`-Datei neben `docker-compose.yml` setzen.
 - **liga-sync** holt alle 30 Minuten Tabelle & Spielplan nach `public/data/liga.json`. Ist die Datei frisch,
   fragen Besucher die API gar nicht erst an. Fällt der Sync aus, lädt der Browser die Daten direkt.
 
 Dann den bestehenden Reverse-Proxy (der bisher auf den WordPress-Container zeigt) auf den `web`-Container
-umbiegen, z. B. bei nginx `proxy_pass http://127.0.0.1:8080;`. TLS/HTTPS und die Weiterleitung
+umbiegen, z. B. bei nginx `proxy_pass http://127.0.0.1:8080;` (bzw. dein `WEB_PORT`). TLS/HTTPS und die Weiterleitung
 `torpedo-dc.de → www.torpedo-dc.de` bleiben beim Proxy. Wenn alles läuft, den WordPress-Container und
 seine Datenbank stoppen (vorher ein Backup ziehen).
 
