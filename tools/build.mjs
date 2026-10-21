@@ -371,7 +371,7 @@ for (const p of PAGES) {
     .join("\n      ");
   const html = page(body, {
     path: pathForRoot,
-    title: data.title,
+    title: PREVIEW && p.path === "" ? "DC Torpedo Website" : data.title,
     description: data.description,
     bodyClass: p.bodyClass || "page-sub",
     extra: { newsCards, newsCount: String(posts.length) },

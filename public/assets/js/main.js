@@ -341,8 +341,12 @@
         </div>`;
     }
 
-    // Stand
-    const asOf = modified ? new Date(modified) : new Date();
+    // Stand: Server-Zeitstempel, sonst letzte Änderung in den Daten
+    const lastChange = all.reduce((max, m) => {
+      const t = Date.parse(String(m.lastUpdate || "").replace(" ", "T"));
+      return Number.isFinite(t) && t > max ? t : max;
+    }, 0);
+    const asOf = modified ? new Date(modified) : stale && lastChange ? new Date(lastChange) : new Date();
     liga.querySelectorAll("[data-liga-asof]").forEach((el) => {
       el.textContent = `${stale ? "Stand" : "Aktualisiert"}: ${fmt.date(asOf)}, ${fmt.time(asOf)} Uhr`;
     });
