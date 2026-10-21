@@ -88,27 +88,60 @@ Sortierung wie im Ligasystem: Punktdifferenz → Pluspunkte → Spieldifferenz �
 
 ## Auf den Server bringen (WordPress ablösen)
 
+Auf dem Vereinsserver läuft **nginx-proxy** mit **acme-companion** (Compose-Projekt `ssl` unter
+`/home/torpedo-wordpress/ssl`). Websites melden sich dort über das Docker-Netz `ssl_default` und die
+Variablen `VIRTUAL_HOST`/`LETSENCRYPT_HOST` an – genau das macht `deploy/nginx-proxy.yml`.
+Die Darts-App (`app.torpedo-dc.de`) hängt am selben Proxy und bleibt unberührt.
+
+**1. Parallel starten und testen** (stört nichts, der Proxy sieht die Seite noch nicht):
+
 ```bash
-git clone https://github.com/Felixfehltnix/torpedoHomepage.git torpedo-website
+cd /home
+git clone -b claude/relaxed-faraday-8yjgv5 https://github.com/Felixfehltnix/torpedoHomepage.git torpedo-website
 cd torpedo-website
 docker compose up -d
+curl -sI http://127.0.0.1:8080/            # → 200
+docker compose logs liga-sync              # → „Liga-Daten aktualisiert“
 ```
 
-- **web** (nginx) liefert `public/` aus – nur lokal auf `127.0.0.1:8080`. Ist 8080 belegt, einen anderen Port per
-  `WEB_PORT=8085` in einer `.env`-Datei neben `docker-compose.yml` setzen.
-- **liga-sync** holt alle 30 Minuten Tabelle & Spielplan nach `public/data/liga.json`. Ist die Datei frisch,
-  fragen Besucher die API gar nicht erst an. Fällt der Sync aus, lädt der Browser die Daten direkt.
+Ansehen vom eigenen Rechner: `ssh -L 8080:127.0.0.1:8080 <user>@<server>` und dann http://localhost:8080 öffnen.
 
-Dann den bestehenden Reverse-Proxy (der bisher auf den WordPress-Container zeigt) auf den `web`-Container
-umbiegen, z. B. bei nginx `proxy_pass http://127.0.0.1:8080;` (bzw. dein `WEB_PORT`). TLS/HTTPS und die Weiterleitung
-`torpedo-dc.de → www.torpedo-dc.de` bleiben beim Proxy. Wenn alles läuft, den WordPress-Container und
-seine Datenbank stoppen (vorher ein Backup ziehen).
+**2. Umschalten** (Website ca. 10 Sekunden weg, die Darts-App merkt nichts – nginx-proxy lädt nur neu):
+
+```bash
+docker stop wordpress-app                  # WordPress gibt torpedo-dc.de frei (nur stoppen, nicht löschen)
+cd /home/torpedo-website
+echo "COMPOSE_FILE=docker-compose.yml:deploy/nginx-proxy.yml" > .env
+docker compose up -d                       # Website meldet sich beim Proxy an
+curl -sI https://www.torpedo-dc.de/        # → 200
+curl -sI https://torpedo-dc.de/            # → 301 auf www
+```
+
+**Zurück zu WordPress**, falls etwas nicht passt:
+
+```bash
+cd /home/torpedo-website && rm .env && docker compose up -d
+docker start wordpress-app
+```
+
+**3. Aufräumen** (nach ein paar Tagen): WordPress sichern (Datenbank-Dump + `wp-content`), dann
+`wordpress-app` und `wordpressdb` entfernen und aus `/home/torpedo-wordpress/ssl/docker-compose.yml`
+austragen. Bis dahin dort kein `docker compose up -d` ohne Dienstnamen ausführen – das würde WordPress
+wieder starten, und es würde sich die Domain mit der neuen Seite teilen.
+
+**Wichtig:** Den Proxy-Container nie mit `docker restart nginx` neu starten (docker-gen merkt sich dann
+falsche IPs), sondern nur mit `docker compose up -d --force-recreate nginx` in `/home/torpedo-wordpress/ssl`.
+Und kein `docker system/image/volume prune` – das kann die Darts-App treffen.
+
+**Updates:** `git pull` in `/home/torpedo-website` reicht, nginx liefert die neuen Dateien sofort aus.
+Nur wenn sich `deploy/nginx.conf` ändert: `docker compose up -d --force-recreate web`.
 
 Alte WordPress-Adressen (z. B. `/happy-birthday-siggi/`, `/feed/`, `/members/`) werden per 301 auf die neuen
 Seiten umgeleitet (`deploy/redirects.conf`, wird automatisch erzeugt). `wp-admin`, `wp-login.php` und
 `xmlrpc.php` antworten mit 410.
 
-Updates: `git pull` reicht – nginx liefert die neuen Dateien sofort aus.
+**Anderer Server ohne nginx-proxy:** `docker compose up -d` startet die Seite auf `127.0.0.1:8080`
+(Port per `WEB_PORT` in `.env` änderbar); davor einen beliebigen Reverse-Proxy mit TLS setzen.
 
 ## Noch offen
 

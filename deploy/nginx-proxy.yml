@@ -1,0 +1,27 @@
+# Einbindung hinter nginx-proxy + acme-companion (so läuft es auf dem Vereinsserver).
+# Der Proxy findet den Container über das gemeinsame Docker-Netz und VIRTUAL_HOST,
+# acme-companion kümmert sich über LETSENCRYPT_HOST um die Zertifikate.
+#
+#   docker compose -f docker-compose.yml -f deploy/nginx-proxy.yml up -d
+#
+# Oder dauerhaft in einer .env-Datei neben docker-compose.yml:
+#   COMPOSE_FILE=docker-compose.yml:deploy/nginx-proxy.yml
+#
+# ACHTUNG: Erst starten, wenn kein anderer Container (z. B. WordPress) mehr
+# dieselben Hostnamen in VIRTUAL_HOST trägt – sonst verteilt nginx-proxy die
+# Anfragen auf beide.
+
+services:
+  web:
+    environment:
+      VIRTUAL_HOST: ${SITE_HOSTS:-torpedo-dc.de,www.torpedo-dc.de}
+      VIRTUAL_PORT: "80"
+      LETSENCRYPT_HOST: ${SITE_HOSTS:-torpedo-dc.de,www.torpedo-dc.de}
+    networks:
+      - default
+      - proxy
+
+networks:
+  proxy:
+    name: ${PROXY_NETWORK:-ssl_default}
+    external: true
