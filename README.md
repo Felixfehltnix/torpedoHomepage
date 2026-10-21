@@ -5,7 +5,8 @@ nur HTML, CSS und ein bisschen JavaScript, ausgeliefert von nginx.
 
 - **Startanimation**: Der Dart fliegt rein, das Logo baut sich per Sonar-Sweep auf. Ein Klick aufs Logo spielt sie nochmal ab.
 - **Saison live**: Tabelle, Spielplan, Ergebnisse und „Nächstes Spiel“ kommen aus dem Ligasystem (2K Dart Software / NDV), Termine gibt’s als Kalenderdatei.
-- **News** als Markdown-Dateien, daraus werden statische Seiten gebaut.
+- **News** als Markdown-Dateien, daraus werden statische Seiten gebaut – bequem über die **Redaktion unter `/admin/`**
+  (Login, Formular, Foto-Upload mit Komprimierung im Browser) oder per Hand.
 - **Datensparsam**: Schriften lokal, keine Cookies, kein Tracking, Karte erst nach Klick.
 
 ## Aufbau
@@ -19,6 +20,8 @@ src/
   pages/                Startseite, Impressum, Datenschutz, 404
 content/news/           News-Beiträge (Markdown)
 site.config.json        E-Mail, Liga-API, Spielort
+admin/                  Redaktions-Dienst (Node, ohne Pakete) + Dockerfile
+public/admin/           Redaktions-Oberfläche (hinter HTTP Basic Auth)
 tools/build.mjs         Seitengenerator (Node ≥ 18, keine Abhängigkeiten)
 tools/bilder.py         Fotos → WebP (optional, braucht Pillow)
 deploy/                 nginx-Konfiguration, Liga-Sync
@@ -36,7 +39,40 @@ python3 -m http.server 8080 --directory public
 Nach jeder Änderung an `src/`, `content/` oder `site.config.json` einmal `node tools/build.mjs`
 ausführen und die erzeugten Dateien mit committen. Der Server braucht dann nur `git pull`.
 
-## News schreiben
+## News über die Redaktion (`/admin/`)
+
+Unter `https://www.torpedo-dc.de/admin/` gibt es nach dem Login ein Formular: Titel, Datum, Text,
+Titelbild und weitere Fotos. Die Fotos werden **im Browser** verkleinert (1600 px und 800 px, WebP,
+auf Safari JPEG), dabei fallen alle Metadaten wie GPS weg – aus einem 3-MB-Handyfoto werden meist
+150–250 KB. Danach baut der Server die Seiten neu, der Beitrag ist sofort online.
+Bestehende Beiträge lassen sich dort auch bearbeiten (Text als Markdown) und löschen.
+
+Jede Änderung wird auf dem Server als Git-Commit gespeichert und – wenn ein `GITHUB_TOKEN` gesetzt
+ist – nach GitHub gepusht. So bleibt GitHub die Sicherung, und ein späteres `git pull` klappt ohne Konflikte.
+
+**Einrichten** (einmalig, in `/home/torpedo-website`):
+
+```bash
+# 1. Zugang anlegen (Benutzername "felix" anpassen; weitere Personen: Zeile mit >> anhängen)
+mkdir -p deploy/admin-auth
+printf "felix:%s\n" "$(openssl passwd -apr1)" > deploy/admin-auth/htpasswd   # fragt nach dem Passwort
+chmod 644 deploy/admin-auth/htpasswd                                          # nginx muss sie lesen können
+
+# 2. Optional, aber empfohlen: Push nach GitHub
+#    GitHub → Settings → Developer settings → Fine-grained tokens: nur Repo "torpedoHomepage",
+#    Berechtigung "Contents: Read and write".
+echo "GITHUB_TOKEN=github_pat_…" >> .env
+echo "SITE_UID=$(stat -c %u .)" >> .env && echo "SITE_GID=$(stat -c %g .)" >> .env
+
+# 3. Starten bzw. aktualisieren
+docker compose up -d --build
+```
+
+Ohne `deploy/admin-auth/htpasswd` bleibt `/admin/` gesperrt. Der Dienst `admin` hängt nur im internen
+Netz des Projekts, nicht am Proxy-Netz. Jedes Foto wird einzeln hochgeladen und bleibt unter 900 KB,
+deshalb muss am nginx-proxy (Standard-Limit 1 MB pro Anfrage) nichts geändert werden.
+
+## News per Hand schreiben
 
 1. Fotos vorbereiten (verkleinert, dreht richtig, entfernt GPS-Daten):
    ```bash
@@ -134,7 +170,8 @@ falsche IPs), sondern nur mit `docker compose up -d --force-recreate nginx` in `
 Und kein `docker system/image/volume prune` – das kann die Darts-App treffen.
 
 **Updates:** `git pull` in `/home/torpedo-website` reicht, nginx liefert die neuen Dateien sofort aus.
-Nur wenn sich `deploy/nginx.conf` ändert: `docker compose up -d --force-recreate web`.
+Wenn sich `deploy/nginx.conf`, `docker-compose.yml` oder `admin/` ändern: `docker compose up -d --build`
+(ggf. `--force-recreate web`). Achtung: `.env` nur mit `>>` ergänzen, nicht mit `>` überschreiben.
 
 Alte WordPress-Adressen (z. B. `/happy-birthday-siggi/`, `/feed/`, `/members/`) werden per 301 auf die neuen
 Seiten umgeleitet (`deploy/redirects.conf`, wird automatisch erzeugt). `wp-admin`, `wp-login.php` und
@@ -148,3 +185,4 @@ Seiten umgeleitet (`deploy/redirects.conf`, wird automatisch erzeugt). `wp-admin
 - [ ] Kontakt-E-Mail in `site.config.json` eintragen (dann erscheint auch der „Schreib uns“-Button)
 - [ ] Impressum vervollständigen (`src/pages/impressum.html`, rot markierte Stellen)
 - [ ] Datenschutz: Speicherdauer der Server-Logs eintragen (`src/pages/datenschutz.html`)
+- [ ] Redaktion einrichten: Passwortdatei + optional `GITHUB_TOKEN` (siehe oben)

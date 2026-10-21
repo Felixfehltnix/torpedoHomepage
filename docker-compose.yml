@@ -4,6 +4,7 @@
 #
 # "web" liefert den Ordner public/ mit nginx aus.
 # "liga-sync" holt alle 30 Minuten Tabelle & Spielplan nach public/data/.
+# "admin" speichert News aus der Redaktion unter /admin/ (Login per HTTP Basic Auth).
 #
 # Der Port ist nur auf 127.0.0.1 erreichbar (Docker-Ports umgehen sonst die
 # Firewall). Der Reverse-Proxy vor dem bisherigen WordPress zeigt dann auf
@@ -22,6 +23,7 @@ services:
       - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ./deploy/redirects.conf:/etc/nginx/snippets/redirects.conf:ro
       - ./deploy/security-headers.conf:/etc/nginx/snippets/security-headers.conf:ro
+      - ./deploy/admin-auth:/etc/nginx/admin-auth:ro
 
   liga-sync:
     image: alpine:3.20
@@ -33,3 +35,20 @@ services:
       - ./deploy/liga-sync.sh:/sync/liga-sync.sh:ro
       - ./site.config.json:/config/site.config.json:ro
       - ./public/data:/data
+
+  admin:
+    build: ./admin
+    image: torpedo-admin
+    restart: unless-stopped
+    # Läuft als Besitzer des Repos, damit neue Dateien nicht root gehören
+    # (SITE_UID/SITE_GID in .env, z. B. aus: stat -c '%u %g' .)
+    user: "${SITE_UID:-0}:${SITE_GID:-0}"
+    environment:
+      SITE_DIR: /site
+      HOME: /tmp
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      GIT_CONFIG_COUNT: "1"
+      GIT_CONFIG_KEY_0: safe.directory
+      GIT_CONFIG_VALUE_0: /site
+    volumes:
+      - .:/site

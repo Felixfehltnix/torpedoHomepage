@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Redaktion – DC Torpedo</title>
+<link rel="icon" href="../favicon.ico" sizes="any">
+<link rel="stylesheet" href="../assets/css/main.css">
+<link rel="stylesheet" href="admin.css">
+<script src="admin.js" defer></script>
+</head>
+<body class="admin">
+<header class="admin-bar">
+  <div class="wrap admin-bar__inner">
+    <a class="brand" href="../">
+      <img class="brand__dart" src="../assets/img/dart.svg" alt="" width="406" height="59">
+      DC <span>Torpedo</span>
+    </a>
+    <span class="admin-bar__title">Redaktion</span>
+    <a class="admin-bar__link" href="../" target="_blank" rel="noopener">Website ansehen ↗</a>
+  </div>
+</header>
+
+<main class="wrap admin-main">
+  <section class="admin-card" aria-labelledby="form-title">
+    <div class="admin-card__head">
+      <h1 id="form-title" class="admin-h1">Neuer Beitrag</h1>
+      <button type="button" class="btn-text" id="cancel-edit" hidden>Bearbeiten abbrechen</button>
+    </div>
+
+    <form id="post-form" novalidate>
+      <div class="field">
+        <label for="title">Titel</label>
+        <input id="title" name="title" type="text" maxlength="140" required autocomplete="off" placeholder="z. B. Heimsieg gegen Teutonen B!">
+      </div>
+
+      <div class="field field--date">
+        <label for="date">Datum</label>
+        <input id="date" name="date" type="date" required>
+      </div>
+
+      <div class="field">
+        <label for="text">Text</label>
+        <textarea id="text" name="text" rows="12" placeholder="Was ist passiert? Der erste Absatz erscheint auch als Vorschau auf der Startseite."></textarea>
+        <p class="hint">Leerzeile = neuer Absatz · <code>**fett**</code> · <code>*kursiv*</code> · <code>## Zwischenüberschrift</code> · <code>[Linktext](https://…)</code></p>
+      </div>
+
+      <div class="field">
+        <span class="label" id="cover-label">Titelbild</span>
+        <div class="current-cover" id="current-cover" hidden>
+          <img alt="Aktuelles Titelbild" id="current-cover-img">
+          <label class="check"><input type="checkbox" id="remove-cover"> Titelbild entfernen</label>
+        </div>
+        <label class="drop" for="cover">
+          <input id="cover" type="file" accept="image/*" aria-labelledby="cover-label">
+          <span class="drop__text"><strong>Foto auswählen</strong> oder hierher ziehen</span>
+          <span class="drop__sub">Wird oben im Beitrag und auf der Startseite gezeigt</span>
+        </label>
+        <ul class="thumbs" id="cover-preview" aria-live="polite"></ul>
+      </div>
+
+      <div class="field">
+        <span class="label" id="gallery-label">Weitere Fotos (Galerie)</span>
+        <label class="drop" for="gallery">
+          <input id="gallery" type="file" accept="image/*" multiple aria-labelledby="gallery-label">
+          <span class="drop__text"><strong>Fotos auswählen</strong> oder hierher ziehen</span>
+          <span class="drop__sub">Mehrere auf einmal möglich · werden vor dem Hochladen verkleinert</span>
+        </label>
+        <ul class="thumbs" id="gallery-preview" aria-live="polite"></ul>
+      </div>
+
+      <div class="actions">
+        <button class="btn" type="submit" id="submit">Veröffentlichen</button>
+        <span class="savings" id="savings"></span>
+      </div>
+      <div class="status" id="status" role="status" aria-live="polite" hidden></div>
+    </form>
+  </section>
+
+  <section class="admin-card" aria-labelledby="list-title">
+    <div class="admin-card__head">
+      <h2 id="list-title" class="admin-h1">Beiträge</h2>
+      <span class="hint" id="push-info"></span>
+    </div>
+    <ul class="post-list" id="post-list">
+      <li class="post-list__empty">Wird geladen …</li>
+    </ul>
+  </section>
+</main>
+</body>
+</html>

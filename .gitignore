@@ -4,3 +4,6 @@ node_modules/
 .DS_Store
 *.log
 .env
+# Zugangsdaten der Redaktion und zwischengespeicherte Uploads
+deploy/admin-auth/
+.uploads/

@@ -110,9 +110,9 @@ function imageSize(webPath) {
 function img(root, src, { alt = "", sizes = "100vw", cls = "", lazy = true, priority = false } = {}) {
   const size = imageSize(src);
   let srcset = "";
-  const m = src.match(/^(.*)-1600\.webp$/);
+  const m = src.match(/^(.*)-1600\.(webp|jpe?g)$/);
   if (m) {
-    const small = `${m[1]}-800.webp`;
+    const small = `${m[1]}-800.${m[2]}`;
     if (existsSync(join(STATIC, small.replace(/^\//, "")))) {
       srcset = ` srcset="${asset(root, small)} 800w, ${asset(root, src)} ${size?.w || 1600}w" sizes="${sizes}"`;
     }
@@ -131,8 +131,10 @@ function inline(s) {
   return esc(s)
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
     .replace(/(^|[^*])\*(?!\s)(.+?)\*/g, "$1<em>$2</em>")
-    .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_, t, href) => {
-      const ext = /^https?:/.test(href.replace(/&amp;/g, "&"));
+    .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (all, t, href) => {
+      // Nur sichere Ziele zulassen (kein javascript: o. Ä.)
+      if (!/^(https?:\/\/|mailto:|\/|#)/i.test(href)) return t;
+      const ext = /^https?:/i.test(href);
       return `<a href="${href}"${ext ? ' rel="noopener" target="_blank"' : ""}>${t}</a>`;
     });
 }
@@ -262,7 +264,7 @@ function render(tpl, vars) {
 function page(tpl, { path, title, description, bodyClass = "page-sub", ogType = "website", ogImage, extra = {}, absolute = false }) {
   // Die 404-Seite wird unter beliebigen Pfaden ausgeliefert → absolute Pfade
   const root = absolute && !PREVIEW ? "/" : rootFor(path);
-  const isHome = path === "";
+  const isHome = path === "" && !absolute; // die 404-Seite ist nie die Startseite
   const vars = {
     ...SITE,
     ...extra,
@@ -531,7 +533,7 @@ if (!PREVIEW && OUT === STATIC) {
   write(
     join(ROOT, "deploy/security-headers.conf"),
     `# Automatisch erzeugt von tools/build.mjs – nicht von Hand bearbeiten.
-add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-${scriptHash}'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' ${apiOrigin}; frame-src https://www.openstreetmap.org; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'" always;
+add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-${scriptHash}'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' ${apiOrigin}; frame-src https://www.openstreetmap.org; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'" always;
 add_header X-Content-Type-Options "nosniff" always;
 add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), interest-cohort=()" always;
