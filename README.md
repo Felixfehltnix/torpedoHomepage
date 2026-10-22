@@ -219,6 +219,6 @@ Seiten umgeleitet (`deploy/nginx/redirects.inc`, erzeugt der Build). `wp-admin`,
 ## Noch offen
 
 - [x] Kontakt-E-Mail in `site.config.json` eintragen (dann erscheint auch der „Schreib uns“-Button)
-- [x] Impressum (Name ohne Anschrift – auf Wunsch; Anschrift wäre gesetzlich vorgesehen)
+- [x] Impressum (Anschrift c/o Schinkeltreff)
 - [x] Datenschutz: Speicherdauer der Server-Logs (14 Tage – muss zur Log-Rotation auf dem Server passen)
 - [x] WordPress entfernt
