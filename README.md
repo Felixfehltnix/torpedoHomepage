@@ -205,8 +205,9 @@ echo "<server-ip> $(cut -d' ' -f1,2 /etc/ssh/ssh_host_ed25519_key.pub)"   # → 
 - Den Proxy-Container nie mit `docker restart nginx` neu starten (docker-gen merkt sich dann falsche IPs),
   sondern nur mit `docker compose up -d --force-recreate nginx` in `/home/torpedo-wordpress/ssl`.
 - Kein `docker system/image/volume prune` – das kann die Darts-App treffen.
-- In `/home/torpedo-wordpress/ssl` kein `docker compose up -d` ohne Dienstnamen, solange WordPress dort noch
-  eingetragen ist – das würde WordPress wieder starten, und es würde sich die Domain mit der neuen Seite teilen.
+- In `/home/torpedo-wordpress/ssl` `docker compose` immer mit Dienstnamen aufrufen (z. B. `nginx`). Falls dort
+  noch WordPress-Dienste eingetragen sind, würden sie sonst wieder starten und sich die Domain mit der neuen
+  Seite teilen.
 
 Alte WordPress-Adressen (z. B. `/happy-birthday-siggi/`, `/feed/`, `/members/`) werden per 301 auf die neuen
 Seiten umgeleitet (`deploy/nginx/redirects.inc`, erzeugt der Build). `wp-admin`, `wp-login.php` und
@@ -217,7 +218,7 @@ Seiten umgeleitet (`deploy/nginx/redirects.inc`, erzeugt der Build). `wp-admin`,
 
 ## Noch offen
 
-- [ ] Kontakt-E-Mail in `site.config.json` eintragen (dann erscheint auch der „Schreib uns“-Button)
+- [x] Kontakt-E-Mail in `site.config.json` eintragen (dann erscheint auch der „Schreib uns“-Button)
 - [ ] Impressum vervollständigen (`src/pages/impressum.html`, rot markierte Stellen)
 - [ ] Datenschutz: Speicherdauer der Server-Logs eintragen (`src/pages/datenschutz.html`)
-- [ ] WordPress endgültig entfernen (vorher prüfen, dass das Backup vom 21.10. vollständig ist)
+- [x] WordPress entfernt
