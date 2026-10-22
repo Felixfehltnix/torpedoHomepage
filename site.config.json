@@ -15,5 +15,9 @@
     "city": "49084 Osnabrück",
     "lat": "52.27847",
     "lon": "8.07606"
+  },
+  "github": {
+    "repo": "Felixfehltnix/torpedoHomepage",
+    "branch": "master"
   }
 }

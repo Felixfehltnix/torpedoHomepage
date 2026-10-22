@@ -257,3 +257,17 @@
 .post-list__meta button:hover { color: var(--chalk); }
 .post-list__meta .danger:hover { color: var(--loss); }
 .post-list__empty { display: block !important; color: var(--chalk-3); }
+
+.post-list__pending { color: var(--brass); font-weight: 500; }
+.spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 8px;
+  vertical-align: -2px;
+  border: 2px solid var(--line-2);
+  border-top-color: var(--brass);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }

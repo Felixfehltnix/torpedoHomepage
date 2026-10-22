@@ -1,9 +1,21 @@
-# Vom Server geschriebene Liga-Daten (deploy/liga-sync.sh)
-public/data/
+# Erzeugt von tools/build.mjs (wird beim Deploy auf dem Server gebaut)
+/public/index.html
+/public/404.html
+/public/news/
+/public/impressum/
+/public/datenschutz/
+/public/sitemap.xml
+/public/feed.xml
+/deploy/nginx/*.inc
+
+# Vom Server geschrieben
+/public/data/
+/public/deploy.json
+
+# Lokal / geheim
+.env
+/deploy/admin-auth/
+.uploads/
 node_modules/
 .DS_Store
 *.log
-.env
-# Zugangsdaten der Redaktion und zwischengespeicherte Uploads
-deploy/admin-auth/
-.uploads/

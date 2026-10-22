@@ -6,35 +6,38 @@
  * Den Login (HTTP Basic Auth) erledigt nginx; dieser Dienst prüft zusätzlich,
  * dass die Anfrage von dort kommt.
  *
- * Fotos werden im Browser verkleinert und einzeln hochgeladen (POST /admin/api/upload,
- * je Datei unter 1 MB – so passt alles durch das Standard-Limit von nginx-proxy).
- * Beim Speichern landen sie unter public/assets/img/news/<slug>/, der Beitrag als
- * Markdown in content/news/. Danach werden die Seiten mit tools/build.mjs neu
- * gebaut und die Änderung committet. Ist GITHUB_TOKEN gesetzt,
- * wird auch nach GitHub gepusht.
+ * Der Dienst schreibt NICHTS auf dem Server. Jede Aktion (Beitrag anlegen,
+ * bearbeiten, löschen) wird zu genau einem Commit auf GitHub (Git Data API).
+ * Die GitHub Action baut daraufhin die Seiten und rollt sie aus – nach etwa
+ * einer Minute ist die Änderung online. Gelesen wird der ausgerollte Stand
+ * aus dem (schreibgeschützt eingebundenen) Repo; für Bearbeitungen holt der
+ * Dienst den neuesten Stand direkt von GitHub.
+ *
+ * Fotos werden im Browser verkleinert und einzeln hochgeladen
+ * (POST /admin/api/upload, je Datei unter 1 MB – so passt alles durch das
+ * Standard-Limit von nginx-proxy) und bis zum Speichern in STAGE_DIR gehalten.
  *
  * Umgebungsvariablen:
+ *   GITHUB_TOKEN  Fine-grained Token, nur dieses Repo, "Contents: Read and write"
  *   SITE_DIR      Pfad zum Repo (Standard: /site)
+ *   STAGE_DIR     Zwischenspeicher für Uploads (Standard: /tmp/uploads)
  *   PORT          Port (Standard: 3000)
- *   GIT_COMMIT    "0" schaltet Commits ab (Standard: an)
- *   GITHUB_TOKEN  Token mit Schreibrecht auf das Repo (optional, für Push)
+ *   GITHUB_API    nur für Tests (Standard: https://api.github.com)
+ * Repo und Branch stehen in site.config.json unter "github".
  */
 import http from "node:http";
-import { readFile, writeFile, mkdir, readdir, rm, rename, stat } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { readFile, writeFile, mkdir, readdir, rm, stat } from "node:fs/promises";
+import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import { randomBytes } from "node:crypto";
 
-const run = promisify(execFile);
 const SITE = resolve(process.env.SITE_DIR || "/site");
+const STAGE_DIR = resolve(process.env.STAGE_DIR || "/tmp/uploads");
 const PORT = Number(process.env.PORT || 3000);
-const NEWS_DIR = join(SITE, "content/news");
-const IMG_DIR = join(SITE, "public/assets/img/news");
-const STAGE_DIR = join(SITE, ".uploads"); // hochgeladene Fotos, bis der Beitrag gespeichert wird
-const GIT_COMMIT = process.env.GIT_COMMIT !== "0";
-const HAS_TOKEN = Boolean(process.env.GITHUB_TOKEN);
+const API = (process.env.GITHUB_API || "https://api.github.com").replace(/\/+$/, "");
+const TOKEN = process.env.GITHUB_TOKEN || "";
+const NEWS = "content/news";
+const IMG = "public/assets/img/news";
 
 const LIMITS = {
   json: 2 * 1024 * 1024, // Beitragsdaten ohne Fotos
@@ -54,12 +57,21 @@ class UserError extends Error {
   }
 }
 
-// Schreibende Aktionen nacheinander ausführen (ein Build zur Zeit)
+// Schreibende Aktionen nacheinander ausführen
 let chain = Promise.resolve();
 function exclusive(fn) {
   const p = chain.then(fn);
   chain = p.catch(() => {});
   return p;
+}
+
+function config() {
+  const c = JSON.parse(readFileSync(join(SITE, "site.config.json"), "utf8"));
+  const repo = c.github?.repo || "";
+  const branch = c.github?.branch || "master";
+  if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) throw new UserError("In site.config.json fehlt github.repo.", 500);
+  if (!/^[\w./-]+$/.test(branch)) throw new UserError("Ungültiger Branch in site.config.json.", 500);
+  return { repo, branch };
 }
 
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -80,8 +92,8 @@ function slugify(text) {
 }
 
 function parseFrontMatter(raw) {
-  const m = raw.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
-  if (!m) return { data: {}, body: raw, order: [] };
+  const m = String(raw).replace(/\r/g, "").match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
+  if (!m) return { data: {}, body: String(raw), order: [] };
   const data = {};
   const order = [];
   for (const line of m[1].split("\n")) {
@@ -100,24 +112,6 @@ function serialize(data, order, body) {
   return `---\n${head}\n---\n\n${body.trim()}\n`;
 }
 
-async function listPosts() {
-  const files = (await readdir(NEWS_DIR)).filter((f) => f.endsWith(".md"));
-  const posts = [];
-  for (const file of files) {
-    const { data } = parseFrontMatter((await readFile(join(NEWS_DIR, file), "utf8")).replace(/\r/g, ""));
-    if (data.slug) posts.push({ file, slug: data.slug, title: data.title || data.slug, date: data.date || "", cover: data.cover || "" });
-  }
-  return posts.sort((a, b) => b.date.localeCompare(a.date));
-}
-
-async function findPost(slug) {
-  if (!SLUG_RE.test(slug)) throw new UserError("Ungültiger Beitrag.", 404);
-  const post = (await listPosts()).find((p) => p.slug === slug);
-  if (!post) throw new UserError("Beitrag nicht gefunden.", 404);
-  const raw = (await readFile(join(NEWS_DIR, post.file), "utf8")).replace(/\r/g, "");
-  return { ...post, ...parseFrontMatter(raw) };
-}
-
 function cleanText(text) {
   return String(text ?? "")
     .replace(/\r\n?/g, "\n")
@@ -133,6 +127,134 @@ function checkTitleDate(title, date) {
   return { title, date: String(date) };
 }
 
+function altText(alt, fallback) {
+  return String(alt || fallback).replace(/[\[\]()\n\r]/g, " ").replace(/\s+/g, " ").trim().slice(0, 140);
+}
+
+function galleryBlock(images) {
+  if (!images.length) return "";
+  if (images.length === 1) return `\n\n![${images[0].alt}](${images[0].path})`;
+  return `\n\n:::galerie\n${images.map((p) => `![${p.alt}](${p.path})`).join("\n")}\n:::`;
+}
+
+/* ------------------------------------------------------------------
+   Ausgerollter Stand (schreibgeschützt eingebunden)
+   ------------------------------------------------------------------ */
+async function listLocal() {
+  const dir = join(SITE, NEWS);
+  const posts = [];
+  for (const file of (await readdir(dir)).filter((f) => f.endsWith(".md"))) {
+    const { data } = parseFrontMatter(await readFile(join(dir, file), "utf8"));
+    if (data.slug) posts.push({ file, slug: data.slug, title: data.title || data.slug, date: data.date || "", cover: data.cover || "" });
+  }
+  return posts.sort((a, b) => b.date.localeCompare(a.date));
+}
+
+function deployedInfo() {
+  try {
+    return JSON.parse(readFileSync(join(SITE, "public/deploy.json"), "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+/* ------------------------------------------------------------------
+   GitHub
+   ------------------------------------------------------------------ */
+const encPath = (p) => p.split("/").map(encodeURIComponent).join("/");
+
+async function gh(method, path, body) {
+  if (!TOKEN) throw new UserError("Auf dem Server ist kein GITHUB_TOKEN gesetzt – Speichern ist so nicht möglich.", 503);
+  let res;
+  try {
+    res = await fetch(`${API}${path}`, {
+      method,
+      headers: {
+        Authorization: `Bearer ${TOKEN}`,
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "dc-torpedo-redaktion",
+        ...(body ? { "Content-Type": "application/json" } : {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+      signal: AbortSignal.timeout(30000),
+    });
+  } catch (err) {
+    throw new UserError("GitHub ist gerade nicht erreichbar. Bitte später noch einmal versuchen.", 502);
+  }
+  if (res.status === 404 && method === "GET") return null;
+  const data = res.status === 204 ? null : await res.json().catch(() => null);
+  if (!res.ok) {
+    if (res.status === 401 || res.status === 403) {
+      throw new UserError("GitHub verweigert den Zugriff. Ist das Token gültig und hat es „Contents: Read and write“?", 502);
+    }
+    const err = new Error(`GitHub ${method} ${path}: ${res.status} ${data?.message || ""}`);
+    err.status = res.status;
+    throw err;
+  }
+  return data;
+}
+
+async function ghFile(path) {
+  const { repo, branch } = config();
+  const d = await gh("GET", `/repos/${repo}/contents/${encPath(path)}?ref=${encodeURIComponent(branch)}`);
+  if (!d || Array.isArray(d) || d.type !== "file") return null;
+  return Buffer.from(d.content || "", "base64").toString("utf8");
+}
+
+async function ghDir(path) {
+  const { repo, branch } = config();
+  const d = await gh("GET", `/repos/${repo}/contents/${encPath(path)}?ref=${encodeURIComponent(branch)}`);
+  return Array.isArray(d) ? d.filter((e) => e.type === "file").map((e) => ({ name: e.name, path: e.path })) : [];
+}
+
+/**
+ * Einen Commit mit allen Änderungen anlegen.
+ * changes: [{ path, content }] (Text) | [{ path, buffer }] (Binär) | [{ path, delete: true }]
+ * Bei einem gleichzeitigen Push wird bis zu dreimal auf dem neuen Stand wiederholt.
+ */
+async function commit(message, changes) {
+  const { repo, branch } = config();
+  const blobs = new Map();
+  for (let attempt = 1; ; attempt++) {
+    const ref = await gh("GET", `/repos/${repo}/git/ref/heads/${branch}`);
+    if (!ref) throw new UserError(`Branch „${branch}“ gibt es auf GitHub nicht.`, 500);
+    const head = ref.object.sha;
+    const headCommit = await gh("GET", `/repos/${repo}/git/commits/${head}`);
+    const tree = [];
+    for (const c of changes) {
+      if (c.delete) {
+        tree.push({ path: c.path, mode: "100644", type: "blob", sha: null });
+      } else if (c.buffer) {
+        if (!blobs.has(c.path)) {
+          const b = await gh("POST", `/repos/${repo}/git/blobs`, { content: c.buffer.toString("base64"), encoding: "base64" });
+          blobs.set(c.path, b.sha);
+        }
+        tree.push({ path: c.path, mode: "100644", type: "blob", sha: blobs.get(c.path) });
+      } else {
+        tree.push({ path: c.path, mode: "100644", type: "blob", content: c.content });
+      }
+    }
+    const newTree = await gh("POST", `/repos/${repo}/git/trees`, { base_tree: headCommit.tree.sha, tree });
+    const newCommit = await gh("POST", `/repos/${repo}/git/commits`, {
+      message,
+      tree: newTree.sha,
+      parents: [head],
+      author: { name: "DC Torpedo Redaktion", email: "redaktion@torpedo-dc.de" },
+    });
+    try {
+      await gh("PATCH", `/repos/${repo}/git/refs/heads/${branch}`, { sha: newCommit.sha, force: false });
+      return newCommit.sha;
+    } catch (err) {
+      if (err.status === 422 && attempt < 3) continue; // jemand anderes hat gerade gepusht
+      throw err;
+    }
+  }
+}
+
+/* ------------------------------------------------------------------
+   Fotos
+   ------------------------------------------------------------------ */
 const ID_RE = /^[a-f0-9]{24}$/;
 
 function imageExt(buf) {
@@ -141,7 +263,7 @@ function imageExt(buf) {
   return null;
 }
 
-/** Ein (im Browser verkleinertes) Foto zwischenspeichern → { id, ext } */
+/** Ein (im Browser verkleinertes) Foto zwischenspeichern → { id } */
 async function stageUpload(req) {
   const type = String(req.headers["content-type"] || "").split(";")[0].trim().toLowerCase();
   const declared = type === "image/webp" ? "webp" : type === "image/jpeg" ? "jpg" : null;
@@ -155,7 +277,6 @@ async function stageUpload(req) {
   return { id, ext: declared };
 }
 
-/** Zwischengespeicherte Dateien, die älter als ein Tag sind, wegräumen */
 async function cleanupStage() {
   if (!existsSync(STAGE_DIR)) return;
   const cutoff = Date.now() - 24 * 3600e3;
@@ -165,185 +286,158 @@ async function cleanupStage() {
   }
 }
 
-/** Foto aus dem Zwischenspeicher an seinen Platz legen: { ext, large, small } (IDs) → Pfad der großen Variante */
-async function saveImage(slug, name, img) {
+/** Zwischengespeichertes Foto für den Commit vorbereiten → { path, changes, staged } */
+async function takeImage(slug, name, img) {
   if (!img || typeof img !== "object") throw new UserError("Bilddaten fehlen.");
   const ext = img.ext === "jpg" || img.ext === "webp" ? img.ext : null;
   if (!ext || !ID_RE.test(String(img.large)) || !ID_RE.test(String(img.small))) throw new UserError("Ungültige Bilddaten.");
-  const from = { large: join(STAGE_DIR, `${img.large}.${ext}`), small: join(STAGE_DIR, `${img.small}.${ext}`) };
-  if (!existsSync(from.large) || !existsSync(from.small)) throw new UserError("Ein Foto ist nicht (mehr) da. Bitte erneut auswählen.");
-  const dir = join(IMG_DIR, slug);
-  await mkdir(dir, { recursive: true });
+  const staged = [join(STAGE_DIR, `${img.small}.${ext}`), join(STAGE_DIR, `${img.large}.${ext}`)];
+  if (!staged.every(existsSync)) throw new UserError("Ein Foto ist nicht (mehr) da. Bitte erneut auswählen.");
   const base = `${name}-${randomBytes(3).toString("hex")}`;
-  await rename(from.small, join(dir, `${base}-800.${ext}`));
-  await rename(from.large, join(dir, `${base}-1600.${ext}`));
-  return `/assets/img/news/${slug}/${base}-1600.${ext}`;
+  const changes = [
+    { path: `${IMG}/${slug}/${base}-800.${ext}`, buffer: await readFile(staged[0]) },
+    { path: `${IMG}/${slug}/${base}-1600.${ext}`, buffer: await readFile(staged[1]) },
+  ];
+  return { path: `/assets/img/news/${slug}/${base}-1600.${ext}`, changes, staged };
 }
 
-function altText(alt, fallback) {
-  return String(alt || fallback).replace(/[\[\]()\n\r]/g, " ").replace(/\s+/g, " ").trim().slice(0, 140);
-}
-
-function galleryBlock(paths) {
-  if (!paths.length) return "";
-  if (paths.length === 1) return `\n\n![${paths[0].alt}](${paths[0].path})`;
-  return `\n\n:::galerie\n${paths.map((p) => `![${p.alt}](${p.path})`).join("\n")}\n:::`;
+async function dropStaged(images) {
+  for (const img of images) for (const f of img.staged) await rm(f, { force: true }).catch(() => {});
 }
 
 /* ------------------------------------------------------------------
-   Bauen & Git
+   Beiträge
    ------------------------------------------------------------------ */
-async function build() {
-  try {
-    const { stdout } = await run(process.execPath, [join(SITE, "tools/build.mjs")], { cwd: SITE, timeout: 120000 });
-    return stdout.trim();
-  } catch (err) {
-    throw new UserError(`Die Seiten konnten nicht gebaut werden: ${(err.stderr || err.message).split("\n").find(Boolean)}`, 500);
+const recentSlugs = new Set(); // angelegt, aber evtl. noch nicht ausgerollt
+
+async function findFile(slug) {
+  if (!SLUG_RE.test(slug)) throw new UserError("Ungültiger Beitrag.", 404);
+  const local = (await listLocal()).find((p) => p.slug === slug);
+  if (local) {
+    const raw = await ghFile(`${NEWS}/${local.file}`);
+    if (raw !== null) return { file: local.file, raw };
   }
+  // Noch nicht ausgerollt oder umbenannt: auf GitHub suchen
+  for (const e of await ghDir(NEWS)) {
+    if (e.name.endsWith(".md") && e.name.replace(/^\d{4}-\d{2}-\d{2}-/, "").replace(/\.md$/, "") === slug) {
+      const raw = await ghFile(e.path);
+      if (raw !== null) return { file: e.name, raw };
+    }
+  }
+  throw new UserError("Beitrag nicht gefunden.", 404);
 }
 
-const git = (args) =>
-  run("git", args, {
-    cwd: SITE,
-    timeout: 60000,
-    env: {
-      ...process.env,
-      GIT_TERMINAL_PROMPT: "0",
-      GIT_AUTHOR_NAME: "DC Torpedo Redaktion",
-      GIT_AUTHOR_EMAIL: "redaktion@torpedo-dc.de",
-      GIT_COMMITTER_NAME: "DC Torpedo Redaktion",
-      GIT_COMMITTER_EMAIL: "redaktion@torpedo-dc.de",
-    },
-  });
-
-// Zugangsdaten nur über einen Credential-Helper, der das Token aus der Umgebung liest
-const AUTH = ["-c", "credential.helper=", "-c", 'credential.helper=!f() { echo username=x-access-token; echo "password=$GITHUB_TOKEN"; }; f'];
-
-async function isRepo() {
-  try {
-    await git(["rev-parse", "--is-inside-work-tree"]);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/** Vor einer Änderung den Stand von GitHub holen, damit der spätere Push durchgeht */
-async function gitPull() {
-  if (!GIT_COMMIT || !HAS_TOKEN || !(await isRepo())) return;
-  try {
-    await git([...AUTH, "pull", "--ff-only", "-q"]);
-  } catch (err) {
-    console.warn("git pull übersprungen:", (err.stderr || err.message).trim());
-  }
-}
-
-async function gitCommit(message) {
-  if (!GIT_COMMIT) return { committed: false, pushed: false, note: "Git ist abgeschaltet." };
-  if (!(await isRepo())) return { committed: false, pushed: false, note: "Kein Git-Repository gefunden." };
-  try {
-    await git(["add", "-A", "--", "content/news", "public", "deploy/redirects.conf", "deploy/security-headers.conf"]);
-    const { stdout } = await git(["diff", "--cached", "--name-only"]);
-    if (!stdout.trim()) return { committed: false, pushed: false, note: "Keine Änderungen." };
-    await git(["commit", "-q", "-m", message]);
-  } catch (err) {
-    return { committed: false, pushed: false, note: `Commit fehlgeschlagen: ${(err.stderr || err.message).trim().split("\n")[0]}` };
-  }
-  if (!HAS_TOKEN) return { committed: true, pushed: false, note: "Auf dem Server gespeichert (kein GITHUB_TOKEN für den Push gesetzt)." };
-  try {
-    await git([...AUTH, "push", "-q", "origin", "HEAD"]);
-    return { committed: true, pushed: true, note: "Auf GitHub gesichert." };
-  } catch (err) {
-    return { committed: true, pushed: false, note: `Gespeichert, aber der Push zu GitHub ist fehlgeschlagen: ${(err.stderr || err.message).trim().split("\n")[0]}` };
-  }
-}
-
-/* ------------------------------------------------------------------
-   Aktionen
-   ------------------------------------------------------------------ */
 async function createPost(input) {
   const { title, date } = checkTitleDate(input.title, input.date);
   const text = cleanText(input.text);
   if (text.length > LIMITS.text) throw new UserError("Der Text ist zu lang.");
   const gallery = Array.isArray(input.gallery) ? input.gallery : [];
-  if (gallery.length + (input.cover ? 1 : 0) > LIMITS.images) throw new UserError(`Bitte höchstens ${LIMITS.images} Bilder pro Beitrag.`);
-  if (!text && !gallery.length) throw new UserError("Bitte einen Text schreiben oder Fotos anhängen.");
+  if (gallery.length + (input.cover ? 1 : 0) > LIMITS.images) throw new UserError(`Bitte höchstens ${LIMITS.images} Fotos pro Beitrag.`);
+  if (!text && !gallery.length && !input.cover) throw new UserError("Bitte einen Text schreiben oder Fotos anhängen.");
 
-  await gitPull();
-  const existing = new Set((await listPosts()).map((p) => p.slug));
+  const taken = new Set([...(await listLocal()).map((p) => p.slug), ...recentSlugs]);
   const base = slugify(title);
   let slug = base;
-  for (let i = 2; existing.has(slug) || existsSync(join(IMG_DIR, slug)); i++) slug = `${base}-${i}`;
+  for (let i = 2; taken.has(slug) || (await ghDir(`${IMG}/${slug}`)).length; i++) slug = `${base}-${i}`;
 
+  const images = [];
   const data = { title, date, slug };
   if (input.cover) {
-    data.cover = await saveImage(slug, "titel", input.cover);
+    const c = await takeImage(slug, "titel", input.cover);
+    images.push(c);
+    data.cover = c.path;
     data.coverAlt = altText(input.cover.alt, title);
   }
-  const paths = [];
-  for (const [i, img] of gallery.entries()) {
-    paths.push({ path: await saveImage(slug, `foto-${i + 1}`, img), alt: altText(img.alt, `${title} – Foto ${i + 1}`) });
+  const gal = [];
+  for (const [i, g] of gallery.entries()) {
+    const img = await takeImage(slug, `foto-${i + 1}`, g);
+    images.push(img);
+    gal.push({ path: img.path, alt: altText(g.alt, `${title} – Foto ${i + 1}`) });
   }
-  const body = `${text}${galleryBlock(paths)}`;
-  await writeFile(join(NEWS_DIR, `${date}-${slug}.md`), serialize(data, ["title", "date", "slug", "cover", "coverAlt"], body));
-  const buildLog = await build();
-  const gitResult = await gitCommit(`News: ${title}`);
-  return { slug, url: `/news/${slug}/`, build: buildLog, git: gitResult };
+  const md = serialize(data, ["title", "date", "slug", "cover", "coverAlt"], `${text}${galleryBlock(gal)}`);
+  const changes = [...images.flatMap((i) => i.changes), { path: `${NEWS}/${date}-${slug}.md`, content: md }];
+  const sha = await commit(`News: ${title}`, changes);
+  recentSlugs.add(slug);
+  await dropStaged(images);
+  return { slug, url: `/news/${slug}/`, commit: sha };
 }
 
 async function updatePost(slug, input) {
-  const post = await findPost(slug);
   const { title, date } = checkTitleDate(input.title, input.date);
   const text = cleanText(input.text);
   if (text.length > LIMITS.text) throw new UserError("Der Text ist zu lang.");
   const gallery = Array.isArray(input.gallery) ? input.gallery : [];
-  if (gallery.length > LIMITS.images) throw new UserError(`Bitte höchstens ${LIMITS.images} Bilder auf einmal.`);
+  if (gallery.length > LIMITS.images) throw new UserError(`Bitte höchstens ${LIMITS.images} Fotos auf einmal.`);
 
-  await gitPull();
-  const data = { ...post.data, title, date, slug };
+  const { file, raw } = await findFile(slug);
+  const { data, order } = parseFrontMatter(raw);
+  Object.assign(data, { title, date, slug });
+
+  const images = [];
   if (input.cover) {
-    data.cover = await saveImage(slug, "titel", input.cover);
+    const c = await takeImage(slug, "titel", input.cover);
+    images.push(c);
+    data.cover = c.path;
     data.coverAlt = altText(input.cover.alt, title);
   } else if (input.removeCover) {
     delete data.cover;
     delete data.coverAlt;
   }
-  const paths = [];
-  for (const [i, img] of gallery.entries()) {
-    paths.push({ path: await saveImage(slug, `foto-neu-${i + 1}`, img), alt: altText(img.alt, `${title} – Foto`) });
+  const gal = [];
+  for (const [i, g] of gallery.entries()) {
+    const img = await takeImage(slug, `foto-neu-${i + 1}`, g);
+    images.push(img);
+    gal.push({ path: img.path, alt: altText(g.alt, `${title} – Foto`) });
   }
-  const body = `${text}${galleryBlock(paths)}`;
-  const newFile = `${date}-${slug}.md`;
-  await writeFile(join(NEWS_DIR, post.file), serialize(data, post.order, body));
-  if (newFile !== post.file) await rename(join(NEWS_DIR, post.file), join(NEWS_DIR, newFile));
-  const buildLog = await build();
-  const gitResult = await gitCommit(`News bearbeitet: ${title}`);
-  return { slug, url: `/news/${slug}/`, build: buildLog, git: gitResult };
+  const body = `${text}${galleryBlock(gal)}`;
+  const newFile = file.replace(/^\d{4}-\d{2}-\d{2}/, date);
+  const changes = [...images.flatMap((i) => i.changes), { path: `${NEWS}/${newFile}`, content: serialize(data, order, body) }];
+  if (newFile !== file) changes.push({ path: `${NEWS}/${file}`, delete: true });
+
+  // Fotos, die im Beitrag nicht mehr vorkommen (Zeile gelöscht, Titelbild ersetzt), entfernen
+  const used = `${data.cover || ""}\n${body}`;
+  for (const f of await ghDir(`${IMG}/${slug}`)) {
+    const m = f.name.match(/^(.+)-(800|1600)\.(webp|jpe?g)$/);
+    if (m && !used.includes(`/${slug}/${m[1]}-1600.${m[3]}`)) changes.push({ path: f.path, delete: true });
+  }
+
+  const sha = await commit(`News bearbeitet: ${title}`, changes);
+  await dropStaged(images);
+  return { slug, url: `/news/${slug}/`, commit: sha };
 }
 
 async function deletePost(slug) {
-  const post = await findPost(slug);
-  await gitPull();
-  await rm(join(NEWS_DIR, post.file));
-  await rm(join(IMG_DIR, slug), { recursive: true, force: true });
-  // Die Ausgabe des gelöschten Beitrags entfernen
-  await rm(join(SITE, "public/news", slug), { recursive: true, force: true });
-  const buildLog = await build();
-  const gitResult = await gitCommit(`News gelöscht: ${post.data.title || slug}`);
-  return { slug, build: buildLog, git: gitResult };
+  const { file, raw } = await findFile(slug);
+  const title = parseFrontMatter(raw).data.title || slug;
+  const changes = [{ path: `${NEWS}/${file}`, delete: true }];
+  for (const f of await ghDir(`${IMG}/${slug}`)) changes.push({ path: f.path, delete: true });
+  const sha = await commit(`News gelöscht: ${title}`, changes);
+  recentSlugs.delete(slug);
+  return { slug, commit: sha };
+}
+
+/** Ist ein Commit schon ausgerollt? (public/deploy.json schreibt das Deploy-Skript) */
+async function deployStatus(sha) {
+  const deployed = deployedInfo();
+  if (!sha) return { deployed };
+  if (!/^[a-f0-9]{7,40}$/.test(sha)) throw new UserError("Ungültiger Commit.");
+  if (!deployed?.commit) return { online: false, deployed };
+  if (deployed.commit.startsWith(sha) || sha.startsWith(deployed.commit)) return { online: true, deployed };
+  const { repo } = config();
+  const cmp = await gh("GET", `/repos/${repo}/compare/${sha}...${deployed.commit}`);
+  return { online: Boolean(cmp && (cmp.status === "ahead" || cmp.status === "identical")), deployed };
 }
 
 /* ------------------------------------------------------------------
    HTTP
    ------------------------------------------------------------------ */
 function send(res, status, payload) {
-  const body = JSON.stringify(payload);
   res.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
     "X-Content-Type-Options": "nosniff",
   });
-  res.end(body);
+  res.end(JSON.stringify(payload));
 }
 
 function readBody(req, limit, tooLarge) {
@@ -395,14 +489,18 @@ const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, "http://localhost");
     const path = url.pathname.replace(/\/+$/, "");
     if (path === "/admin/api/upload" && req.method === "POST") return send(res, 201, await stageUpload(req));
+    if (path === "/admin/api/status" && req.method === "GET") return send(res, 200, await deployStatus(url.searchParams.get("commit")));
     const m = path.match(/^\/admin\/api\/news(?:\/([^/]+))?$/);
     if (!m) throw new UserError("Nicht gefunden.", 404);
     const slug = m[1] ? decodeURIComponent(m[1]) : null;
 
-    if (req.method === "GET" && !slug) return send(res, 200, { posts: await listPosts(), user: req.headers["x-remote-user"], push: HAS_TOKEN });
+    if (req.method === "GET" && !slug) {
+      return send(res, 200, { posts: await listLocal(), user: req.headers["x-remote-user"], token: Boolean(TOKEN), deployed: deployedInfo() });
+    }
     if (req.method === "GET" && slug) {
-      const p = await findPost(slug);
-      return send(res, 200, { slug: p.slug, title: p.data.title || "", date: p.data.date || "", cover: p.data.cover || "", text: p.body.trim() });
+      const { raw } = await findFile(slug);
+      const p = parseFrontMatter(raw);
+      return send(res, 200, { slug, title: p.data.title || "", date: p.data.date || "", cover: p.data.cover || "", text: p.body.trim() });
     }
     if (req.method === "POST" && !slug) {
       const input = await readJson(req);
@@ -416,8 +514,17 @@ const server = http.createServer(async (req, res) => {
     throw new UserError("Methode nicht erlaubt.", 405);
   } catch (err) {
     if (!(err instanceof UserError)) console.error(err);
-    send(res, err.status || 500, { error: err instanceof UserError ? err.message : "Interner Fehler. Details stehen im Log des admin-Containers." });
+    send(res, err.status && err instanceof UserError ? err.status : 500, {
+      error: err instanceof UserError ? err.message : "Interner Fehler. Details stehen im Log des admin-Containers.",
+    });
   }
 });
 
-server.listen(PORT, () => console.log(`Redaktion läuft auf Port ${PORT} (Repo: ${SITE}, Push: ${HAS_TOKEN ? "an" : "aus"})`));
+server.listen(PORT, () => {
+  let target = "?";
+  try {
+    const c = config();
+    target = `${c.repo}@${c.branch}`;
+  } catch {}
+  console.log(`Redaktion läuft auf Port ${PORT} → ${target} (Token: ${TOKEN ? "gesetzt" : "FEHLT"})`);
+});

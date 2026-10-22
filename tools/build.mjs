@@ -2,7 +2,7 @@
 /**
  * DC Torpedo – Seitengenerator (ohne Abhängigkeiten, Node 18+)
  *
- *   node tools/build.mjs              → baut nach public/
+ *   node tools/build.mjs              → baut nach public/ (die erzeugten Dateien sind nicht im Git)
  *   node tools/build.mjs --preview    → Links enden auf index.html (für Vorschau ohne Webserver)
  *   node tools/build.mjs --out pfad   → anderes Zielverzeichnis (Assets werden NICHT kopiert)
  *
@@ -11,9 +11,9 @@
  *   src/pages/*.html      Seiten (Startseite, Impressum, Datenschutz, 404)
  *   content/news/*.md     News-Beiträge (Markdown mit Kopfbereich)
  *
- * Erzeugt: HTML-Seiten, news/, sitemap.xml, feed.xml, deploy/redirects.conf
+ * Erzeugt: HTML-Seiten, news/, sitemap.xml, feed.xml, deploy/nginx/*.inc
  */
-import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync, statSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync, statSync, rmSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -419,6 +419,21 @@ for (const p of PAGES) {
   );
 }
 
+// Seiten gelöschter Beiträge wegräumen (nur erzeugte Ordner mit index.html)
+{
+  const newsOut = join(OUT, "news");
+  const keep = new Set(posts.map((p) => p.slug));
+  if (existsSync(newsOut)) {
+    for (const name of readdirSync(newsOut)) {
+      const dir = join(newsOut, name);
+      if (!keep.has(name) && statSync(dir).isDirectory() && existsSync(join(dir, "index.html"))) {
+        rmSync(dir, { recursive: true, force: true });
+        console.log(`– entfernt: news/${name}/`);
+      }
+    }
+  }
+}
+
 // Einzelne Beiträge
 posts.forEach((p, i) => {
   const path = `news/${p.slug}/`;
@@ -531,7 +546,7 @@ if (!PREVIEW && OUT === STATIC) {
   const scriptHash = createHash("sha256").update(inline).digest("base64");
   const apiOrigin = new URL(SITE.liga.api).origin;
   write(
-    join(ROOT, "deploy/security-headers.conf"),
+    join(ROOT, "deploy/nginx/security-headers.inc"),
     `# Automatisch erzeugt von tools/build.mjs – nicht von Hand bearbeiten.
 add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-${scriptHash}'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' ${apiOrigin}; frame-src https://www.openstreetmap.org; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'" always;
 add_header X-Content-Type-Options "nosniff" always;
@@ -539,13 +554,13 @@ add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), interest-cohort=()" always;
 `
   );
-  written.push("deploy/security-headers.conf");
+  written.push("deploy/nginx/security-headers.inc");
 
   const rules = posts
     .filter((p) => p.oldUrl)
     .map((p) => `location = "${p.oldUrl}" { return 301 /news/${p.slug}/; }`);
   write(
-    join(ROOT, "deploy/redirects.conf"),
+    join(ROOT, "deploy/nginx/redirects.inc"),
     `# Automatisch erzeugt von tools/build.mjs – nicht von Hand bearbeiten.
 # Leitet alte WordPress-Adressen auf die neuen Seiten um.
 ${rules.join("\n")}
@@ -558,7 +573,7 @@ location ^~ /wp-content/uploads/ { return 301 /; }
 location ~ ^/(wp-admin|wp-login\\.php|xmlrpc\\.php|wp-json) { return 410; }
 `
   );
-  written.push("deploy/redirects.conf");
+  written.push("deploy/nginx/redirects.inc");
 }
 
 console.log(`✔ ${written.length} Dateien gebaut${PREVIEW ? " (Vorschau-Modus)" : ""} – ${posts.length} News`);

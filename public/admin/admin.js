@@ -265,16 +265,69 @@
     return { ext: item.result.ext, large: await upload(item.result.large), small: await upload(item.result.small), alt };
   }
 
+  /* ---------------- Veröffentlichung verfolgen ----------------
+     Gespeichert wird als Commit auf GitHub; die GitHub Action rollt ihn aus.
+     Bis dahin steht der Beitrag als „ausstehend“ oben in der Liste. */
+  const pending = new Map(); // slug → { title, action, commit }
+  const ACTION_TEXT = { create: "Wird veröffentlicht …", update: "Änderung wird ausgerollt …", delete: "Wird gelöscht …" };
+
+  function track(slug, title, action, commit, onDone) {
+    pending.set(slug, { title, action, commit });
+    loadList();
+    const started = Date.now();
+    const tick = async () => {
+      try {
+        const st = await request("GET", `api/status?commit=${encodeURIComponent(commit)}`);
+        if (st.online) {
+          pending.delete(slug);
+          await loadList();
+          onDone(true);
+          return;
+        }
+      } catch (_) {
+        /* nochmal versuchen */
+      }
+      if (Date.now() - started > 8 * 60e3) {
+        pending.delete(slug);
+        loadList();
+        onDone(false);
+        return;
+      }
+      setTimeout(tick, 5000);
+    };
+    setTimeout(tick, 4000);
+  }
+
   /* ---------------- Liste ---------------- */
   async function loadList() {
     try {
       const data = await request("GET", API);
-      document.querySelector("#push-info").textContent = data.push ? "Änderungen werden auf GitHub gesichert" : "Änderungen bleiben auf dem Server (kein GitHub-Token)";
-      if (!data.posts.length) {
+      const info = document.querySelector("#push-info");
+      info.textContent = data.token
+        ? "Speichern geht über GitHub – nach ca. 1 Minute online"
+        : "Achtung: Auf dem Server fehlt das GitHub-Token – Speichern klappt so nicht";
+      info.style.color = data.token ? "" : "var(--loss)";
+      const pendingRows = [...pending.entries()]
+        .filter(([slug, p]) => p.action === "create" && !data.posts.some((x) => x.slug === slug))
+        .map(([, p]) => {
+          const li = document.createElement("li");
+          const ph = document.createElement("span");
+          ph.className = "ph skeleton";
+          const title = document.createElement("span");
+          title.className = "post-list__title";
+          title.textContent = p.title;
+          const meta = document.createElement("span");
+          meta.className = "post-list__meta";
+          meta.textContent = ACTION_TEXT.create;
+          li.append(ph, title, meta);
+          return li;
+        });
+      if (!data.posts.length && !pendingRows.length) {
         listEl.innerHTML = '<li class="post-list__empty">Noch keine Beiträge.</li>';
         return;
       }
       listEl.replaceChildren(
+        ...pendingRows,
         ...data.posts.map((p) => {
           const li = document.createElement("li");
           if (p.cover) {
@@ -308,7 +361,15 @@
           del.className = "danger";
           del.textContent = "Löschen";
           del.addEventListener("click", () => removePost(p));
-          meta.append(view, edit, del);
+          const state = pending.get(p.slug);
+          if (state) {
+            const note = document.createElement("span");
+            note.className = "post-list__pending";
+            note.textContent = ACTION_TEXT[state.action];
+            meta.replaceChildren(note);
+          } else {
+            meta.append(view, edit, del);
+          }
           li.append(title, meta);
           return li;
         })
@@ -374,9 +435,11 @@
     setStatus("", "Wird gelöscht …");
     try {
       const res = await request("DELETE", `${API}/${encodeURIComponent(p.slug)}`);
-      setStatus("ok", `Gelöscht.<small>${esc(res.git?.note || "")}</small>`);
+      setStatus("ok", `„${esc(p.title)}“ ist gelöscht.<small>Von der Website verschwindet der Beitrag in etwa einer Minute.</small>`);
       if (editing === p.slug) resetForm();
-      await loadList();
+      track(p.slug, p.title, "delete", res.commit, (ok) => {
+        if (!ok) setStatus("error", "Das Ausrollen dauert ungewöhnlich lange. Bitte im Actions-Tab auf GitHub nachsehen.");
+      });
     } catch (err) {
       setStatus("error", esc(err.message));
     } finally {
@@ -439,10 +502,14 @@
         ? await request("PUT", `${API}/${encodeURIComponent(editing)}`, body)
         : await request("POST", API, body);
 
-      const verb = editing ? "Gespeichert" : "Veröffentlicht";
+      const action = editing ? "update" : "create";
+      const link = `<a href="..${esc(res.url)}" target="_blank" rel="noopener">Beitrag ansehen ↗</a>`;
       resetForm();
-      setStatus("ok", `${verb}! <a href="..${esc(res.url)}" target="_blank" rel="noopener">Beitrag ansehen ↗</a><small>${esc(res.git?.note || "")}</small>`);
-      await loadList();
+      setStatus("", `<span class="spinner" aria-hidden="true"></span>Gespeichert. ${ACTION_TEXT[action]}<small>Das dauert meist etwa eine Minute. Du kannst die Seite offen lassen oder schon den nächsten Beitrag schreiben.</small>`);
+      track(res.slug, title, action, res.commit, (ok) => {
+        if (ok) setStatus("ok", `${action === "create" ? "Online!" : "Änderung ist online!"} ${link}`);
+        else setStatus("error", `Gespeichert, aber noch nicht online. Bitte im Actions-Tab auf GitHub nachsehen. ${link}`);
+      });
     } catch (err) {
       setStatus("error", esc(err.message));
     } finally {

@@ -1,0 +1,61 @@
+# Baut die Website bei jedem Push auf master (auch aus der Redaktion) und
+# rollt sie auf den Vereinsserver aus.
+#
+# Benötigte Secrets (Settings → Secrets and variables → Actions):
+#   DEPLOY_HOST         IP oder Name des Servers
+#   DEPLOY_USER         SSH-Benutzer (mit Zwangsbefehl auf torpedo-deploy)
+#   DEPLOY_SSH_KEY      privater Schlüssel (ed25519)
+#   DEPLOY_KNOWN_HOSTS  Zeile für known_hosts (Host-Schlüssel des Servers)
+# Fehlen sie, läuft nur der Probe-Build.
+
+name: Deploy
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Probe-Build
+        run: |
+          node tools/build.mjs
+          node --check public/assets/js/main.js
+          node --check public/admin/admin.js
+          node --check admin/server.mjs
+          sh -n deploy/deploy.sh
+
+      - name: Auf den Server ausrollen
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          if [ -z "$DEPLOY_SSH_KEY" ] || [ -z "$DEPLOY_HOST" ]; then
+            echo "::warning::Keine Deploy-Secrets gesetzt – nur Probe-Build, nichts ausgerollt."
+            exit 0
+          fi
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy_key \
+              -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=20 \
+              "${DEPLOY_USER:-root}@${DEPLOY_HOST}" "$GITHUB_SHA"

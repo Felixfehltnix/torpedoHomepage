@@ -2,15 +2,20 @@
 #
 #   docker compose up -d
 #
-# "web" liefert den Ordner public/ mit nginx aus.
+# "web"       liefert den Ordner public/ mit nginx aus (Konfiguration: deploy/nginx/).
 # "liga-sync" holt alle 30 Minuten Tabelle & Spielplan nach public/data/.
-# "admin" speichert News aus der Redaktion unter /admin/ (Login per HTTP Basic Auth).
+# "admin"     Redaktion unter /admin/: speichert News als Commit auf GitHub
+#             (braucht GITHUB_TOKEN in .env). Den Rest erledigt das Deploy.
+#
+# Vorher einmal bauen: node tools/build.mjs (bzw. deploy/deploy.sh auf dem Server).
+#
+# Alle Mounts sind Ordner, keine Einzeldateien: Git ersetzt Dateien beim
+# Aktualisieren durch neue, und eingebundene Einzeldateien würden sonst
+# im Container auf dem alten Stand bleiben.
 #
 # Der Port ist nur auf 127.0.0.1 erreichbar (Docker-Ports umgehen sonst die
-# Firewall). Der Reverse-Proxy vor dem bisherigen WordPress zeigt dann auf
-# http://127.0.0.1:${WEB_PORT}. Port ändern ohne Datei anzufassen:
-#   WEB_PORT=8085 docker compose up -d     (oder WEB_PORT=8085 in eine .env-Datei)
-# Siehe README.md.
+# Firewall). Hinter nginx-proxy zusätzlich deploy/nginx-proxy.yml verwenden
+# (siehe README). Port ändern: WEB_PORT=8085 in .env.
 
 services:
   web:
@@ -20,35 +25,29 @@ services:
       - "127.0.0.1:${WEB_PORT:-8080}:80"
     volumes:
       - ./public:/usr/share/nginx/html:ro
-      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./deploy/redirects.conf:/etc/nginx/snippets/redirects.conf:ro
-      - ./deploy/security-headers.conf:/etc/nginx/snippets/security-headers.conf:ro
+      - ./deploy/nginx:/etc/nginx/conf.d:ro
       - ./deploy/admin-auth:/etc/nginx/admin-auth:ro
 
   liga-sync:
     image: alpine:3.20
     restart: unless-stopped
-    command: ["/bin/sh", "/sync/liga-sync.sh"]
+    command: ["/bin/sh", "/repo/deploy/liga-sync.sh"]
     environment:
+      CONFIG: /repo/site.config.json
+      LIGA_OUT: /data/liga.json
       LIGA_INTERVAL: "1800"
     volumes:
-      - ./deploy/liga-sync.sh:/sync/liga-sync.sh:ro
-      - ./site.config.json:/config/site.config.json:ro
+      - .:/repo:ro
       - ./public/data:/data
 
   admin:
-    build: ./admin
-    image: torpedo-admin
+    image: node:22-alpine
     restart: unless-stopped
-    # Läuft als Besitzer des Repos, damit neue Dateien nicht root gehören
-    # (SITE_UID/SITE_GID in .env, z. B. aus: stat -c '%u %g' .)
-    user: "${SITE_UID:-0}:${SITE_GID:-0}"
+    user: node
+    command: ["node", "/site/admin/server.mjs"]
     environment:
       SITE_DIR: /site
-      HOME: /tmp
+      STAGE_DIR: /tmp/uploads
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
-      GIT_CONFIG_COUNT: "1"
-      GIT_CONFIG_KEY_0: safe.directory
-      GIT_CONFIG_VALUE_0: /site
     volumes:
-      - .:/site
+      - .:/site:ro
