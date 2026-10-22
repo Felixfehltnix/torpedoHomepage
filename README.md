@@ -126,8 +126,10 @@ Bei jedem Push auf `master` (auch aus der Redaktion) startet `.github/workflows/
 
 1. **Probe-Build** auf GitHub – geht er schief, wird nichts ausgerollt und GitHub schickt eine Mail.
 2. **SSH zum Server** mit einem Schlüssel, der dort **nur** `torpedo-deploy` starten darf (Zwangsbefehl).
-3. `torpedo-deploy` holt den neuen Stand von `master`, baut die Seiten in einem Container ohne Netzwerk
-   als `nobody` (darf nur die erzeugten Dateien schreiben), prüft die nginx-Konfiguration und lädt nginx sanft neu. Hat sich der Code der Redaktion oder des
+3. `torpedo-deploy` holt den neuen Stand von `master` und **prüft ihn vor dem Auschecken**: keine Symlinks
+   oder Submodule und keine Dateien an Stellen, die nur auf dem Server liegen (`.env`, Passwortdatei,
+   Liga-Daten, erzeugte Seiten). Dann baut es die Seiten in einem Container ohne Netzwerk als `nobody`
+   (darf nur die erzeugten Dateien schreiben), prüft die nginx-Konfiguration und lädt nginx sanft neu. Hat sich der Code der Redaktion oder des
    Liga-Syncs geändert, werden nur diese Container neu gestartet. Zum Schluss schreibt es
    `public/deploy.json` – daran erkennt die Redaktion, dass ihr Commit online ist.
 
@@ -142,6 +144,10 @@ cd /home/torpedo-website
 docker compose up -d                                               # nach Änderungen an docker-compose.yml
 install -m 755 deploy/deploy.sh /usr/local/sbin/torpedo-deploy     # nach Änderungen an deploy/deploy.sh
 ```
+
+Der Branch (`master`) ist im installierten Skript fest eingestellt und wird bewusst nicht aus dem Repo
+gelesen; `github.branch` in `site.config.json` nutzt nur die Redaktion und muss dazu passen. Die Container
+spricht das Skript über ihre Docker-Labels an, die `docker-compose.yml` aus dem Repo liest es nicht.
 
 **Zurückrollen:** auf GitHub den betreffenden Commit zurücknehmen (*Revert*) – die Action rollt den alten
 Stand aus. **Von Hand ausrollen:** `torpedo-deploy` auf dem Server oder in GitHub unter
