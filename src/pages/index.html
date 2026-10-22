@@ -32,6 +32,11 @@ description: Der DC Torpedo ist ein Steeldart-Team aus Osnabrück-Schinkel. Heim
       </button>
       <div class="hero__tagline">
         <p class="hero__kicker">Steeldart aus <b>Osnabrück-Schinkel</b></p>
+        <a class="ticker ticker--live" href="#live" data-live hidden>
+          <span class="ticker__label"><span class="live-dot" aria-hidden="true"></span>Live</span>
+          <span>Wir streamen gerade auf Twitch</span>
+          <span class="ticker__go" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+        </a>
         <a class="ticker" href="#saison" data-next-match hidden>
           <span class="ticker__label">Nächstes Spiel</span>
           <span data-next-text></span>
@@ -42,6 +47,30 @@ description: Der DC Torpedo ist ein Steeldart-Team aus Osnabrück-Schinkel. Heim
     <a class="scroll-cue" href="#verein" aria-label="Weiter zum Verein">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 9 7 7 7-7"/></svg>
     </a>
+  </section>
+
+  <!-- ============ Live auf Twitch (nur sichtbar, wenn gestreamt wird) ============ -->
+  <section class="section live" id="live" aria-labelledby="live-title" data-live-section data-twitch="{{twitch.channel}}" hidden>
+    <div class="wrap live__grid">
+      <div class="live__player" data-live-player>
+        <button class="live__start" type="button" data-live-load>
+          <span class="live__play" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l11-6.5a1 1 0 0 0 0-1.72l-11-6.5A1 1 0 0 0 8 5.5z"/></svg></span>
+          <span class="live__start-text">Stream hier ansehen</span>
+          <span class="live__start-note">Der Player kommt von Twitch und wird erst nach Klick geladen.</span>
+        </button>
+      </div>
+      <div class="live__info">
+        <p class="eyebrow live__eyebrow"><span class="live-dot" aria-hidden="true"></span>Jetzt live auf Twitch</p>
+        <h2 class="display display--md live__title" id="live-title" data-live-title>DC Torpedo live</h2>
+        <p class="live__meta" data-live-meta></p>
+        <div class="live__actions">
+          <button class="btn" type="button" data-live-load>
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l11-6.5a1 1 0 0 0 0-1.72l-11-6.5A1 1 0 0 0 8 5.5z"/></svg>
+            Hier ansehen</button>
+          <a class="btn btn--ghost" href="https://www.twitch.tv/{{twitch.channel}}" rel="noopener" target="_blank">Auf Twitch öffnen ↗</a>
+        </div>
+      </div>
+    </div>
   </section>
 
   <!-- ============ 01 Verein ============ -->

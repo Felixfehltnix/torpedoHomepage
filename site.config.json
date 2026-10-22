@@ -16,6 +16,9 @@
     "lat": "52.27847",
     "lon": "8.07606"
   },
+  "twitch": {
+    "channel": "dctorpedo"
+  },
   "github": {
     "repo": "Felixfehltnix/torpedoHomepage",
     "branch": "master"

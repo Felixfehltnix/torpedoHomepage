@@ -118,6 +118,23 @@ Die API-Adresse steckt auch in der Sicherheitsrichtlinie (CSP); die baut der Dep
 Die Tabelle wird im Browser aus allen Ergebnissen berechnet (2 Punkte pro Sieg, 1 pro Unentschieden;
 Sortierung wie im Ligasystem: Punktdifferenz → Pluspunkte → Spieldifferenz → Spiele → Legdifferenz → Legs).
 
+## Live auf Twitch
+
+Läuft auf `twitch.tv/dctorpedo` (Kanal: `site.config.json` → `twitch.channel`) ein Stream, zeigt die Seite
+innerhalb einer Minute eine LIVE-Plakette neben dem Logo und auf der Startseite einen Live-Bereich mit
+Titel, Startzeit und Zuschauerzahl. Der Twitch-Player lädt erst nach Klick (Datenschutz).
+
+Der Container `liga-sync` fragt dafür jede Minute bei Twitch nach und schreibt `public/data/live.json`.
+Er braucht eine (kostenlose) Twitch-App: auf https://dev.twitch.tv/console → „Register Your Application“
+(Redirect-URL `https://www.torpedo-dc.de`, Kategorie „Website Integration“), dann in `.env` auf dem Server:
+
+```
+TWITCH_CLIENT_ID=…
+TWITCH_CLIENT_SECRET=…
+```
+
+und `docker compose up -d liga-sync`. Ohne die beiden Werte fehlt nur die Live-Anzeige.
+
 ## Deployment
 
 ### So läuft ein Deploy

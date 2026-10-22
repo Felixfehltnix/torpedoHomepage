@@ -3,7 +3,9 @@
 #   docker compose up -d
 #
 # "web"       liefert den Ordner public/ mit nginx aus (Konfiguration: deploy/nginx/).
-# "liga-sync" holt alle 30 Minuten Tabelle & Spielplan nach public/data/.
+# "liga-sync" holt alle 30 Minuten Tabelle & Spielplan nach public/data/ und
+#             jede Minute, ob auf Twitch gestreamt wird (braucht TWITCH_CLIENT_ID
+#             und TWITCH_CLIENT_SECRET in .env, sonst entfällt nur die Live-Anzeige).
 # "admin"     Redaktion unter /admin/: speichert News als Commit auf GitHub
 #             (braucht GITHUB_TOKEN in .env). Den Rest erledigt das Deploy.
 #
@@ -36,6 +38,9 @@ services:
       CONFIG: /repo/site.config.json
       LIGA_OUT: /data/liga.json
       LIGA_INTERVAL: "1800"
+      LIVE_OUT: /data/live.json
+      TWITCH_CLIENT_ID: ${TWITCH_CLIENT_ID:-}
+      TWITCH_CLIENT_SECRET: ${TWITCH_CLIENT_SECRET:-}
     volumes:
       - .:/repo:ro
       - ./public/data:/data

@@ -507,6 +507,73 @@
     });
   }
 
+  /* ---------------------------------------------------------------
+     8. Live auf Twitch
+     Der Server fragt jede Minute bei Twitch nach und legt das Ergebnis
+     in /data/live.json ab (deploy/liga-sync.sh). Der Browser fragt nur
+     unseren Server – Twitch lädt erst nach Klick auf „ansehen“.
+     --------------------------------------------------------------- */
+  const liveNav = document.querySelectorAll("[data-live]");
+  const liveSec = document.querySelector("[data-live-section]");
+  const liveSrc = liveNav[0]?.dataset.liveSrc;
+  let playerLoaded = false;
+
+  function setLive(stream) {
+    liveNav.forEach((el) => (el.hidden = !stream));
+    if (!liveSec) return;
+    // Läuft der Player schon, bleibt er stehen – Twitch zeigt selbst „offline“ an
+    if (!stream) {
+      if (!playerLoaded) liveSec.hidden = true;
+      return;
+    }
+    liveSec.hidden = false;
+    liveSec.querySelector("[data-live-title]").textContent = stream.title || "DC Torpedo live";
+    const parts = [];
+    const since = stream.started_at ? new Date(stream.started_at) : null;
+    if (since && !isNaN(since)) parts.push(`Live seit ${fmt.time(since)} Uhr`);
+    if (Number.isFinite(stream.viewer_count)) parts.push(`${stream.viewer_count} Zuschauer`);
+    liveSec.querySelector("[data-live-meta]").textContent = parts.join(" · ");
+  }
+
+  async function checkLive() {
+    let stream = null;
+    try {
+      const res = await fetch(liveSrc, { cache: "no-store" });
+      if (res.ok) {
+        const j = await res.json();
+        const fresh = Date.now() / 1000 - Number(j.checked || 0) < 15 * 60;
+        const s = j?.twitch?.data?.[0];
+        if (fresh && s && s.type === "live") stream = s;
+      }
+    } catch (_) {
+      stream = null;
+    }
+    setLive(stream);
+  }
+
+  if (liveSrc) {
+    checkLive();
+    setInterval(() => document.hidden || checkLive(), 60e3);
+    document.addEventListener("visibilitychange", () => document.hidden || checkLive());
+  }
+
+  liveSec?.querySelectorAll("[data-live-load]").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      const box = liveSec.querySelector("[data-live-player]");
+      const channel = encodeURIComponent(liveSec.dataset.twitch || "");
+      const iframe = document.createElement("iframe");
+      iframe.src = `https://player.twitch.tv/?channel=${channel}&parent=${encodeURIComponent(location.hostname)}&autoplay=true`;
+      iframe.title = "Livestream des DC Torpedo auf Twitch";
+      iframe.allow = "autoplay; fullscreen";
+      iframe.allowFullscreen = true;
+      box.replaceChildren(iframe);
+      box.classList.add("is-playing");
+      playerLoaded = true;
+      liveSec.querySelectorAll(".live__actions [data-live-load]").forEach((b) => b.remove());
+      box.scrollIntoView({ behavior: "smooth", block: "center" });
+    })
+  );
+
   /* Jahr im Footer */
   document.querySelectorAll("[data-year]").forEach((el) => (el.textContent = new Date().getFullYear()));
 })();
