@@ -220,5 +220,5 @@ Seiten umgeleitet (`deploy/nginx/redirects.inc`, erzeugt der Build). `wp-admin`,
 
 - [x] Kontakt-E-Mail in `site.config.json` eintragen (dann erscheint auch der „Schreib uns“-Button)
 - [ ] Impressum vervollständigen (`src/pages/impressum.html`, rot markierte Stellen)
-- [ ] Datenschutz: Speicherdauer der Server-Logs eintragen (`src/pages/datenschutz.html`)
+- [x] Datenschutz: Speicherdauer der Server-Logs (14 Tage – muss zur Log-Rotation auf dem Server passen)
 - [x] WordPress entfernt
