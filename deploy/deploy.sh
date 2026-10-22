@@ -9,9 +9,11 @@
 #   install -m 755 /home/torpedo-website/deploy/deploy.sh /usr/local/sbin/torpedo-deploy
 #
 # Das Skript liegt bewusst AUSSERHALB des Repos und übernimmt Änderungen an
-# docker-compose.yml nicht automatisch. So kann ein Push auf GitHub nur Inhalte
-# ausrollen (gebaut in einem abgeschotteten Container), aber nie Befehle auf
-# dem Server ausführen.
+# docker-compose.yml nicht automatisch. Code aus dem Repo läuft dadurch nur in
+# Containern: der Build (tools/build.mjs) ohne Netzwerk als "nobody", der nur
+# die erzeugten Dateien schreiben darf, und die Redaktion als "node".
+# Trotzdem gilt: Wer auf master pushen darf, bestimmt, was dort läuft – und vor
+# jedem "docker compose up -d" von Hand gehört der Diff der Compose-Datei geprüft.
 #
 # Ablauf: neuesten Stand holen → Seiten bauen → nginx prüfen und sanft neu
 # laden → Redaktion/Liga-Sync bei Code-Änderungen neu starten → deploy.json.
@@ -44,9 +46,19 @@ changed() {
     [ "$OLD" != "$NEW" ] && ! git diff --quiet "$OLD" "$NEW" -- "$@"
 }
 
-# Seiten bauen – in einem Container ohne Netzwerk, als Besitzer des Repos
-OWNER=$(stat -c '%u:%g' "$REPO_DIR")
-docker run --rm --network none -u "$OWNER" -v "$REPO_DIR:/site" -w /site node:22-alpine node tools/build.mjs
+# Seiten bauen – in einem Container ohne Netzwerk und ohne root-Rechte.
+# Der Build darf nur die erzeugten Dateien schreiben (sie gehören "nobody"),
+# den Rest des Repos (Code, docker-compose.yml …) kann er nicht verändern.
+BUILD_ID=65534:65534
+for f in public/index.html public/404.html public/sitemap.xml public/feed.xml \
+         deploy/nginx/redirects.inc deploy/nginx/security-headers.inc; do
+    [ -e "$f" ] || : > "$f"
+done
+mkdir -p public/news public/impressum public/datenschutz
+chown -R "$BUILD_ID" public/index.html public/404.html public/sitemap.xml public/feed.xml \
+    public/news public/impressum public/datenschutz \
+    deploy/nginx/redirects.inc deploy/nginx/security-headers.inc
+docker run --rm --network none -u "$BUILD_ID" -v "$REPO_DIR:/site" -w /site node:22-alpine node tools/build.mjs
 
 # nginx: Konfiguration prüfen, dann sanft neu laden (laufende Verbindungen bleiben)
 if ! docker compose exec -T web nginx -t -q; then

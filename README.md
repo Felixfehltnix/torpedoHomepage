@@ -126,15 +126,16 @@ Bei jedem Push auf `master` (auch aus der Redaktion) startet `.github/workflows/
 
 1. **Probe-Build** auf GitHub – geht er schief, wird nichts ausgerollt und GitHub schickt eine Mail.
 2. **SSH zum Server** mit einem Schlüssel, der dort **nur** `torpedo-deploy` starten darf (Zwangsbefehl).
-3. `torpedo-deploy` holt den neuen Stand von `master`, baut die Seiten in einem Container ohne Netzwerk,
-   prüft die nginx-Konfiguration und lädt nginx sanft neu. Hat sich der Code der Redaktion oder des
+3. `torpedo-deploy` holt den neuen Stand von `master`, baut die Seiten in einem Container ohne Netzwerk
+   als `nobody` (darf nur die erzeugten Dateien schreiben), prüft die nginx-Konfiguration und lädt nginx sanft neu. Hat sich der Code der Redaktion oder des
    Liga-Syncs geändert, werden nur diese Container neu gestartet. Zum Schluss schreibt es
    `public/deploy.json` – daran erkennt die Redaktion, dass ihr Commit online ist.
 
 Bewusst **nicht** automatisch: Änderungen an `docker-compose.yml` und am Deploy-Skript selbst. Das Skript
-liegt außerhalb des Repos (`/usr/local/sbin/torpedo-deploy`), damit ein Push auf GitHub nie Befehle auf
-dem Server ausführen kann. Ändern sich diese Dateien, meldet die Action eine Warnung, und auf dem Server
-ist ein Handgriff nötig:
+liegt außerhalb des Repos (`/usr/local/sbin/torpedo-deploy`). Code aus dem Repo läuft so nur in Containern
+(Build ohne Netzwerk als `nobody`, Redaktion als `node`) – aber: **Wer auf `master` pushen darf, bestimmt,
+was dort läuft.** Ändern sich die beiden Dateien, meldet die Action eine Warnung; auf dem Server dann
+erst den Diff ansehen (`git diff <alt>..HEAD -- docker-compose.yml`) und von Hand nachziehen:
 
 ```bash
 cd /home/torpedo-website
@@ -174,23 +175,24 @@ docker compose up -d
 torpedo-deploy
 ```
 
-**Deploy-Schlüssel für GitHub** (privater Teil nur bei GitHub, nicht auf dem Server):
+**Deploy-Schlüssel für GitHub** – beim rechtlosen Benutzer `deploy` (kein Passwort, nicht in der
+docker-Gruppe), der nur dieses eine Skript per sudo starten darf. Der private Teil liegt nur bei GitHub:
 
 ```bash
+# sudo-Regel nur für das Deploy-Skript
+echo 'deploy ALL=(root) NOPASSWD: /usr/local/sbin/torpedo-deploy' > /etc/sudoers.d/torpedo-deploy
+chmod 440 /etc/sudoers.d/torpedo-deploy && visudo -cf /etc/sudoers.d/torpedo-deploy
+
+# Schlüssel erzeugen und mit Zwangsbefehl eintragen
 ssh-keygen -t ed25519 -N "" -C "github-actions-torpedo" -f /tmp/torpedo_deploy
-# öffentlichen Teil mit Zwangsbefehl eintragen (bei Root-Login; sonst Benutzer + sudo, siehe unten)
-echo "restrict,command=\"/usr/local/sbin/torpedo-deploy\" $(cat /tmp/torpedo_deploy.pub)" >> /root/.ssh/authorized_keys
+echo "restrict,command=\"sudo /usr/local/sbin/torpedo-deploy\" $(cat /tmp/torpedo_deploy.pub)" >> ~deploy/.ssh/authorized_keys
 cat /tmp/torpedo_deploy                       # → GitHub-Secret DEPLOY_SSH_KEY, danach:
 shred -u /tmp/torpedo_deploy /tmp/torpedo_deploy.pub
 echo "<server-ip> $(cut -d' ' -f1,2 /etc/ssh/ssh_host_ed25519_key.pub)"   # → Secret DEPLOY_KNOWN_HOSTS
 ```
 
-Erlaubt der Server kein Root-Login per Schlüssel (`sshd -T | grep permitrootlogin` → `no`): einen Benutzer
-`deploy` anlegen, in `/etc/sudoers.d/torpedo-deploy` nur `deploy ALL=(root) NOPASSWD: /usr/local/sbin/torpedo-deploy`
-erlauben und im `authorized_keys` von `deploy` `command="sudo /usr/local/sbin/torpedo-deploy"` eintragen.
-
 **GitHub-Secrets** (Repo → *Settings → Secrets and variables → Actions*): `DEPLOY_HOST` (Server-IP),
-`DEPLOY_USER` (`root` bzw. `deploy`), `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS`. Ohne Secrets läuft nur der Probe-Build.
+`DEPLOY_USER` (`deploy`), `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS`. Ohne Secrets läuft nur der Probe-Build.
 
 ### Wichtig auf dem Vereinsserver
 
